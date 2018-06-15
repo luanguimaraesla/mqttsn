@@ -71,7 +71,8 @@ class Client:
 
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((self.host, self.port))
-        mreq = struct.pack("4sl", socket.inet_aton(self.host), socket.INADDR_ANY)
+        mreq = struct.pack("4sl", socket.inet_aton(self.host),
+                           socket.INADDR_ANY)
 
         self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
@@ -98,25 +99,25 @@ class Client:
     def register_callback(self, callback):
         self.callback = callback
 
-    def connect(self, cleansession=True):
+    def connect(self, clean_session=True):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # self.sock.settimeout(5.0)
 
         self.sock.connect((self.host, self.port))
 
         connect = MQTTSN.Connects()
-        connect.ClientId = self.client_id
-        connect.CleanSession = cleansession
-        connect.KeepAliveTimer = 0
+        connect.client_id = self.client_id
+        connect.clean_session = clean_session
+        connect.keepalive_timer = 0
         self.sock.send(connect.pack())
 
-        response, address = MQTTSN.unpackPacket(MQTTSN.getPacket(self.sock))
-        assert response.mh.MsgType == MQTTSN.CONNACK
+        response, address = MQTTSN.unpack_packet(MQTTSN.get_packet(self.sock))
+        assert response.mh.msg_type == MQTTSN.CONNACK
 
         self.start_receiver()
 
     def start_receiver(self):
-        self.__receiver = MQTTSNinternal.Receivers(self.sock)
+        self.__receiver = MQTTSNinternal.receivers(self.sock)
         if self.callback:
             thread.start_new_thread(self.__receiver, (self.callback,))
 
