@@ -18,31 +18,37 @@
 
 # Low-level protocol interface for MQTTs
 
+import logging
+
+log = logging.getLogger('mqttsn')
+
 # Message types
 ADVERTISE, SEARCHGW, GWINFO, reserved, \
-CONNECT, CONNACK, \
-WILLTOPICREQ, WILLTOPIC, WILLMSGREQ, WILLMSG, \
-REGISTER, REGACK, \
-PUBLISH, PUBACK, PUBCOMP, PUBREC, PUBREL, reserved1, \
-SUBSCRIBE, SUBACK, UNSUBSCRIBE, UNSUBACK, \
-PINGREQ, PINGRESP, DISCONNECT, reserved2, \
-WILLTOPICUPD, WILLTOPICRESP, WILLMSGUPD, WILLMSGRESP = range(30)
+    CONNECT, CONNACK, \
+    WILLTOPICREQ, WILLTOPIC, WILLMSGREQ, WILLMSG, \
+    REGISTER, REGACK, \
+    PUBLISH, PUBACK, PUBCOMP, PUBREC, PUBREL, reserved1, \
+    SUBSCRIBE, SUBACK, UNSUBSCRIBE, UNSUBACK, \
+    PINGREQ, PINGRESP, DISCONNECT, reserved2, \
+    WILLTOPICUPD, WILLTOPICRESP, WILLMSGUPD, WILLMSGRESP = range(30)
 
-packet_names = [ "ADVERTISE", "SEARCHGW", "GWINFO", "reserved", \
-"CONNECT", "CONNACK", \
-"WILLTOPICREQ", "WILLTOPIC", "WILLMSGREQ", "WILLMSG", \
-"REGISTER", "REGACK", \
-"PUBLISH", "PUBACK", "PUBCOMP", "PUBREC", "PUBREL", "reserved", \
-"SUBSCRIBE", "SUBACK", "UNSUBSCRIBE", "UNSUBACK", \
-"PINGREQ", "PINGRESP", "DISCONNECT", "reserved", \
-"WILLTOPICUPD", "WILLTOPICRESP", "WILLMSGUPD", "WILLMSGRESP"]
+packet_names = [
+    "ADVERTISE", "SEARCHGW", "GWINFO", "reserved",
+    "CONNECT", "CONNACK",
+    "WILLTOPICREQ", "WILLTOPIC", "WILLMSGREQ", "WILLMSG",
+    "REGISTER", "REGACK",
+    "PUBLISH", "PUBACK", "PUBCOMP", "PUBREC", "PUBREL", "reserved",
+    "SUBSCRIBE", "SUBACK", "UNSUBSCRIBE", "UNSUBACK",
+    "PINGREQ", "PINGRESP", "DISCONNECT", "reserved",
+    "WILLTOPICUPD", "WILLTOPICRESP", "WILLMSGUPD", "WILLMSGRESP"
+]
 
 topic_id_type_names = ["NORMAL", "PREDEFINED", "SHORT_NAME"]
 TOPIC_NORMAL, TOPIC_PREDEFINED, TOPIC_SHORTNAME = range(3)
 
 
 def write_int_16(length):
-    return chr(length / 256)+ chr(length % 256)
+    return chr(length / 256) + chr(length % 256)
 
 
 def read_int_16(buf):
@@ -50,8 +56,10 @@ def read_int_16(buf):
 
 
 def get_packet(a_socket):
-    "receive the next packet"
-    buf, address = aSocket.recvfrom(65535) # get the first byte fixed header
+    """
+    Receive the next packet
+    """
+    buf, address = a_socket.recvfrom(65535)  # get the first byte fixed header
     if buf == "":
         return None
 
@@ -59,909 +67,930 @@ def get_packet(a_socket):
     if length == 1:
         if buf == "":
             return None
-        length = readInt16(buf[1:])
+        length = read_int_16(buf[1:])
 
     return buf, address
 
-def MessageType(buf):
-  if ord(buf[0]) == 1:
-    msgtype = ord(buf[3])
-  else:
-    msgtype = ord(buf[1])
-  return msgtype
+
+def message_type(buf):
+    if ord(buf[0]) == 1:
+        msgtype = ord(buf[3])
+    else:
+        msgtype = ord(buf[1])
+    return msgtype
+
 
 class Flags:
+    def __init__(self):
+        self.dup = False          # 1 bit
+        self.qos = 0              # 2 bits
+        self.retain = False       # 1 bit
+        self.will = False         # 1 bit
+        self.clean_sessioin = True  # 1 bit
+        self.topic_id_type = 0      # 2 bits
 
-  def __init__(self):
-    self.DUP = False          # 1 bit
-    self.QoS = 0              # 2 bits
-    self.Retain = False       # 1 bit
-    self.Will = False         # 1 bit
-    self.CleanSession = True  # 1 bit
-    self.TopicIdType = 0      # 2 bits
+    def __eq__(self, flags):
+        return self.dup == flags.dup and \
+             self.qos == flags.qos and \
+             self.retain == flags.retain and \
+             self.will == flags.will and \
+             self.clean_session == flags.clean_session and \
+             self.topic_id_type == flags.topic_id_type
 
-  def __eq__(self, flags):
-    return self.DUP == flags.DUP and \
-         self.QoS == flags.QoS and \
-         self.Retain == flags.Retain and \
-         self.Will == flags.Will and \
-         self.CleanSession == flags.CleanSession and \
-         self.TopicIdType == flags.TopicIdType
+    def __ne__(self, flags):
+        return not self.__eq__(flags)
 
-  def __ne__(self, flags):
-    return not self.__eq__(flags)
+    def __str__(self):
+        """
+        Returns:
+            printable representation of data
+        """
+        return f'< dup {self.dup}, qos {self.qos}, retain {self.retain}, ' \
+               f'will {self.will}, clean_session {self.clean_session}, ' \
+               f'topic_id_type {self.topic_id_type} >'
 
-  def __str__(self):
-    "return printable representation of our data"
-    return '{DUP '+str(self.DUP)+ \
-           ", QoS "+str(self.QoS)+", Retain "+str(self.Retain) + \
-           ", Will "+str(self.Will)+", CleanSession "+str(self.CleanSession) + \
-           ", TopicIdType "+str(self.TopicIdType)+"}"
+    def pack(self):
+        """
+        Pack data into string buffer ready for transmission down socket
+        """
+        buffer = (
+            chr(
+                (self.dup << 7) |
+                (self.qos << 5) |
+                (self.retain << 4) |
+                (self.will << 3) |
+                (self.clean_session << 2) |
+                self.topic_id_type
+            )
+        )
 
-  def pack(self):
-    "pack data into string buffer ready for transmission down socket"
-    buffer = chr( (self.DUP << 7) | (self.QoS << 5) | (self.Retain << 4) | \
-         (self.Will << 3) | (self.CleanSession << 2) | self.TopicIdType )
-    #print "Flags - pack", str(bin(ord(buffer))), len(buffer)
-    return buffer
+        return buffer
 
-  def unpack(self, buffer):
-    "unpack data from string buffer into separate fields"
-    b0 = ord(buffer[0])
-    #print "Flags - unpack", str(bin(b0)), len(buffer), buffer
-    self.DUP = ((b0 >> 7) & 0x01) == 1
-    self.QoS = (b0 >> 5) & 0x03
-    self.Retain = ((b0 >> 4) & 0x01) == 1
-    self.Will = ((b0 >> 3) & 0x01) == 1
-    self.CleanSession = ((b0 >> 2) & 0x01) == 1
-    self.TopicIdType = (b0 & 0x03)
-    return 1
+    def unpack(self, buffer):
+        """
+        Unpack data from string buffer into separate fields
+        """
+        b0 = ord(buffer[0])
+        self.dup = ((b0 >> 7) & 0x01) == 1
+        self.qos = (b0 >> 5) & 0x03
+        self.retain = ((b0 >> 4) & 0x01) == 1
+        self.will = ((b0 >> 3) & 0x01) == 1
+        self.clean_session = ((b0 >> 2) & 0x01) == 1
+        self.topic_id_type = (b0 & 0x03)
+
+        return 1
+
 
 class MessageHeaders:
+    def __init__(self, msg_type):
+        self.length = 0
+        self.msg_type = msg_type
 
-  def __init__(self, aMsgType):
-    self.Length = 0
-    self.MsgType = aMsgType
+    def __eq__(self, mh):
+        return self.length == mh.length and self.msg_type == mh.msg_type
 
-  def __eq__(self, mh):
-    return self.Length == mh.Length and self.MsgType == mh.MsgType
+    def __str__(self):
+        """
+        Returns:
+            printable stresentation of our data
+        """
+        return f'length {self.length}, {packet_names[self.msg_type]}'
 
-  def __str__(self):
-    "return printable stresentation of our data"
-    return "Length "+str(self.Length) + ", " + packetNames[self.MsgType]
+    def pack(self, length):
+        """
+        Pack data into string buffer ready for transmission down socket
+        """
+        # length does not yet include the length or msgtype bytes we
+        # are going to add
+        buffer = self.encode(length) + chr(self.msg_type)
+        return buffer
 
-  def pack(self, length):
-    "pack data into string buffer ready for transmission down socket"
-    # length does not yet include the length or msgtype bytes we are going to add
-    buffer = self.encode(length) + chr(self.MsgType)
-    return buffer
+    def encode(self, length):
+        self.length = length + 2
+        assert 2 <= self.length <= 65535
+        if self.length < 256:
+            buffer = chr(self.length)
+            log.debug(f'Encoding length {self.length}')
+        else:
+            self.length += 2
+            buffer = chr(1) + write_int_16(self.length)
+        return buffer
 
-  def encode(self, length):
-    self.Length = length + 2
-    assert 2 <= self.Length <= 65535
-    if self.Length < 256:
-      buffer = chr(self.Length)
-      print "length", self.Length
-    else:
-      self.Length += 2
-      buffer = chr(1) + writeInt16(self.Length)
-    return buffer
+    def unpack(self, buffer):
+        """
+        Unpack data from string buffer into separate fields
+        """
+        (self.length, bytes) = self.decode(buffer)
+        self.msg_type = ord(buffer[bytes])
+        return bytes + 1
 
-  def unpack(self, buffer):
-    "unpack data from string buffer into separate fields"
-    (self.Length, bytes) = self.decode(buffer)
-    self.MsgType = ord(buffer[bytes])
-    return bytes + 1
+    def decode(self, buffer):
+        value = ord(buffer[0])
+        if value > 1:
+            bytes = 1
+        else:
+            value = read_int_16(buffer[1:])
+            bytes = 3
+        return (value, bytes)
 
-  def decode(self, buffer):
-    value = ord(buffer[0])
-    if value > 1:
-      bytes = 1
-    else:
-      value = readInt16(buffer[1:])
-      bytes = 3
-    return (value, bytes)
 
-def writeUTF(aString):
-  return writeInt16(len(aString)) + aString
+def writeUTF(a_string):
+    return write_int_16(len(a_string)) + a_string
+
 
 def readUTF(buffer):
-  length = readInt16(buffer)
-  return buffer[2:2+length]
+    length = read_int_16(buffer)
+    return buffer[2:2+length]
 
 
 class Packets:
+    def pack(self):
+        return self.mh.pack(0)
 
-  def pack(self):
-    return self.mh.pack(0)
+    def __str__(self):
+        return str(self.mh)
 
-  def __str__(self):
-    return str(self.mh)
+    def __eq__(self, packet):
+        return False if packet is None else self.mh == packet.mh
 
-  def __eq__(self, packet):
-    return False if packet == None else self.mh == packet.mh
+    def __ne__(self, packet):
+        return not self.__eq__(packet)
 
-  def __ne__(self, packet):
-    return not self.__eq__(packet)
 
 class Advertises(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(ADVERTISE)
+        self.gw_id = 0         # 1 byte
+        self.duration = 0  # 2 bytes
+        if buffer:
+            self.unpack(buffer)
 
-  def __init__(self, buffer=None):
-    self.mh = MessageHeaders(ADVERTISE)
-    self.GwId = 0     # 1 byte
-    self.Duration = 0 # 2 bytes
-    if buffer:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = chr(self.gw_id) + write_int_16(self.duration)
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = chr(self.GwId) + writeInt16(self.Duration)
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == ADVERTISE
+        self.gw_id = ord(buffer[pos])
+        pos += 1
+        self.duration = read_int_16(buffer[pos:])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == ADVERTISE
-    self.GwId = ord(buffer[pos])
-    pos += 1
-    self.Duration = readInt16(buffer[pos:])
+    def __str__(self):
+        return f'{self.mh}, gw_id {self.gw_id}, duration {self.duration}'
 
-  def __str__(self):
-    return str(self.mh) + " GwId "+str(self.GwId)+" Duration "+str(self.Duration)
-
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.GwId == packet.GwId and \
-           self.Duration == packet.Duration
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+               self.gw_id == packet.gw_id and \
+               self.duration == packet.duration
 
 
 class SearchGWs(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(SEARCHGW)
+        self.radius = 0
+        if buffer:
+            self.unpack(buffer)
 
-  def __init__(self, buffer=None):
-    self.mh = MessageHeaders(SEARCHGW)
-    self.Radius = 0
-    if buffer:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = write_int_16(self.radius)
+        buffer = self.mh.pack(len(buffer)) + buffer
+        return buffer
 
-  def pack(self):
-    buffer = writeInt16(self.Radius)
-    buffer = self.mh.pack(len(buffer)) + buffer
-    return buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == SEARCHGW
+        self.radius = read_int_16(buffer[pos:])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == SEARCHGW
-    self.Radius = readInt16(buffer[pos:])
+    def __str__(self):
+        return f'{self.mh}, radius {self.radius}'
 
-  def __str__(self):
-    return str(self.mh) + " Radius "+str(self.Radius)
 
 class GWInfos(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(GWINFO)
+        self.gw_id = 0    # 1 byte
+        self.gw_add = None  # optional
+        if buffer:
+            self.unpack(buffer)
 
-  def __init__(self, buffer=None):
-    self.mh = MessageHeaders(GWINFO)
-    self.GwId = 0  # 1 byte
-    self.GwAdd = None # optional
-    if buffer:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = chr(self.gw_id)
+        if self.gw_add:
+            buffer += self.gw_add
+        buffer = self.mh.pack(len(buffer)) + buffer
+        return buffer
 
-  def pack(self):
-    buffer = chr(self.GwId)
-    if self.GwAdd:
-      buffer += self.GwAdd
-    buffer = self.mh.pack(len(buffer)) + buffer
-    return buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == GWINFO
+        self.gw_id = buffer[pos]
+        pos += 1
+        if pos >= self.mh.length:
+            self.gw_add = None
+        else:
+            self.gw_add = buffer[pos:]
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == GWINFO
-    self.GwId = buffer[pos]
-    pos += 1
-    if pos >= self.mh.Length:
-      self.GwAdd = None
-    else:
-      self.GwAdd = buffer[pos:]
+    def __str__(self):
+        buf = f'{self.mh} radius {self.gw_id}'
+        if self.gw_add:
+            buf += f' gw_add {self.gw_add}'
+        return buf
 
-  def __str__(self):
-    buf = str(self.mh) + " Radius "+str(self.GwId)
-    if self.GwAdd:
-      buf += " GwAdd "+self.GwAdd
-    return buf
 
 class Connects(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(CONNECT)
+        self.flags = Flags()
+        self.protocol_id = 1
+        self.duration = 30
+        self.client_id = ""
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(CONNECT)
-    self.Flags = Flags()
-    self.ProtocolId = 1
-    self.Duration = 30
-    self.ClientId = ""
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = self.flags.pack() + chr(self.protocol_id) + \
+                         write_int_16(self.duration) + self.client_id
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = self.Flags.pack() + chr(self.ProtocolId) + writeInt16(self.Duration) + self.ClientId
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == CONNECT
+        pos += self.flags.unpack(buffer[pos])
+        self.protocol_id = ord(buffer[pos])
+        pos += 1
+        self.duration = read_int_16(buffer[pos:])
+        pos += 2
+        self.client_id = buffer[pos:]
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == CONNECT
-    pos += self.Flags.unpack(buffer[pos])
-    self.ProtocolId = ord(buffer[pos])
-    pos += 1
-    self.Duration = readInt16(buffer[pos:])
-    pos += 2
-    self.ClientId = buffer[pos:]
+    def __str__(self):
+        return f'{self.mh}, flags {self.flags}, protocol_id ' \
+               f'{self.protocol_id}, duration {self.duration}, ' \
+               f'client_id {self.client_id}'
 
-  def __str__(self):
-    buf = str(self.mh) + ", " + str(self.Flags) + \
-    ", ProtocolId " + str(self.ProtocolId) + \
-    ", Duration " + str(self.Duration) + \
-    ", ClientId " + self.ClientId
-    return buf
-
-  def __eq__(self, packet):
-    rc = Packets.__eq__(self, packet) and \
-           self.Flags == packet.Flags and \
-           self.ProtocolId == packet.ProtocolId and \
-           self.Duration == packet.Duration and \
-           self.ClientId == packet.ClientId
-    return rc
+    def __eq__(self, packet):
+        rc = Packets.__eq__(self, packet) and \
+             self.flags == packet.flags and \
+             self.protocol_id == packet.protocol_id and \
+             self.duration == packet.duration and \
+             self.client_id == packet.client_id
+        return rc
 
 
 class Connacks(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(CONNACK)
+        self.return_code = 0  # 1 byte
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(CONNACK)
-    self.ReturnCode = 0 # 1 byte
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = chr(self.return_code)
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = chr(self.ReturnCode)
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == CONNACK
+        self.return_code = ord(buffer[pos])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == CONNACK
-    self.ReturnCode = ord(buffer[pos])
+    def __str__(self):
+        return f'{self.mh}, return_code {self.return_code}'
 
-  def __str__(self):
-    return str(self.mh)+", ReturnCode "+str(self.ReturnCode)
-
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.ReturnCode == packet.ReturnCode
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+                     self.return_code == packet.return_code
 
 
 class WillTopicReqs(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(WILLTOPICREQ)
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(WILLTOPICREQ)
-    if buffer != None:
-      self.unpack(buffer)
-
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == WILLTOPICREQ
+    def unpack(self, buffer):
+        # pos = self.mh.unpack(buffer)
+        self.mh.unpack(buffer)
+        assert self.mh.msg_type == WILLTOPICREQ
 
 
 class WillTopics(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(WILLTOPIC)
+        self.flags = Flags()
+        self.will_topic = ""
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(WILLTOPIC)
-    self.flags = Flags()
-    self.WillTopic = ""
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = self.flags.pack() + self.will_topic
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = self.flags.pack() + self.WillTopic
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == WILLTOPIC
+        pos += self.flags.unpack(buffer[pos:])
+        self.will_topic = buffer[pos:self.mh.length]
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == WILLTOPIC
-    pos += self.flags.unpack(buffer[pos:])
-    self.WillTopic = buffer[pos:self.mh.Length]
+    def __str__(self):
+        return f'{self.mh}, flags {self.flags}, will_topic {self.will_topic}'
 
-  def __str__(self):
-    return str(self.mh)+", Flags "+str(self.flags)+", WillTopic "+self.WillTopic
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+               self.flags == packet.flags and \
+               self.will_topic == packet.will_topic
 
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.flags == packet.flags and \
-           self.WillTopic == packet.WillTopic
 
 class WillMsgReqs(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(WILLMSGREQ)
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(WILLMSGREQ)
-    if buffer != None:
-      self.unpack(buffer)
-
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == WILLMSGREQ
+    def unpack(self, buffer):
+        # pos = self.mh.unpack(buffer)
+        self.mh.unpack(buffer)
+        assert self.mh.msg_type == WILLMSGREQ
 
 
 class WillMsgs(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(WILLMSG)
+        self.will_msg = ""
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(WILLMSG)
-    self.WillMsg = ""
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        return self.mh.pack(len(self.will_msg)) + self.will_msg
 
-  def pack(self):
-    return self.mh.pack(len(self.WillMsg)) + self.WillMsg
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == WILLMSG
+        self.will_msg = buffer[pos:self.mh.length]
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == WILLMSG
-    self.WillMsg = buffer[pos:self.mh.Length]
+    def __str__(self):
+        return f'{self.mh}, will_msg {self.will_msg}'
 
-  def __str__(self):
-    return str(self.mh)+", WillMsg "+self.WillMsg
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+                     self.will_msg == packet.will_msg
 
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.WillMsg == packet.WillMsg
 
 class Registers(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(REGISTER)
+        self.topic_id = 0
+        self.msg_id = 0
+        self.topic_name = ""
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(REGISTER)
-    self.TopicId = 0
-    self.MsgId = 0
-    self.TopicName = ""
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = write_int_16(self.topic_id) + \
+                         write_int_16(self.msg_id) + self.topic_name
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = writeInt16(self.TopicId) + writeInt16(self.MsgId) + self.TopicName
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == REGISTER
+        self.topic_id = read_int_16(buffer[pos:])
+        pos += 2
+        self.msg_id = read_int_16(buffer[pos:])
+        pos += 2
+        self.topic_name = buffer[pos:self.mh.length]
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == REGISTER
-    self.TopicId = readInt16(buffer[pos:])
-    pos += 2
-    self.MsgId = readInt16(buffer[pos:])
-    pos += 2
-    self.TopicName = buffer[pos:self.mh.Length]
+    def __str__(self):
+        return f'{self.mh}, topic_id {self.topic_id}, msg_id {self.msg_id}, ' \
+                     f'topic_name {self.topic_name}'
 
-  def __str__(self):
-    return str(self.mh)+", TopicId "+str(self.TopicId)+", MsgId "+str(self.MsgId)+", TopicName "+self.TopicName
-
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.TopicId == packet.TopicId and \
-           self.MsgId == packet.MsgId and \
-           self.TopicName == packet.TopicName
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+                     self.topic_id == packet.topic_id and \
+                     self.msg_id == packet.msg_id and \
+                     self.topic_name == packet.topic_name
 
 
 class Regacks(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(REGACK)
+        self.topic_id = 0
+        self.msg_id = 0
+        self.return_code = 0  # 1 byte
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(REGACK)
-    self.TopicId = 0
-    self.MsgId = 0
-    self.ReturnCode = 0 # 1 byte
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = write_int_16(self.topic_id) + \
+                         write_int_16(self.msg_id) + chr(self.return_code)
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = writeInt16(self.TopicId) + writeInt16(self.MsgId) + chr(self.ReturnCode)
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == REGACK
+        self.topic_id = read_int_16(buffer[pos:])
+        pos += 2
+        self.msg_id = read_int_16(buffer[pos:])
+        pos += 2
+        self.return_code = ord(buffer[pos])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == REGACK
-    self.TopicId = readInt16(buffer[pos:])
-    pos += 2
-    self.MsgId = readInt16(buffer[pos:])
-    pos += 2
-    self.ReturnCode = ord(buffer[pos])
+    def __str__(self):
+        return f'{self.mh}, topic_id {self.topic_id}, msg_id {self.msg_id}, ' \
+                     f'return_code {self.return_code}'
 
-  def __str__(self):
-    return str(self.mh)+", TopicId "+str(self.TopicId)+", MsgId "+str(self.MsgId)+", ReturnCode "+str(self.ReturnCode)
-
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.TopicId == packet.TopicId and \
-           self.MsgId == packet.MsgId and \
-           self.ReturnCode == packet.ReturnCode
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+               self.topic_id == packet.topic_id and \
+               self.msg_id == packet.msg_id and \
+               self.return_code == packet.return_code
 
 
 class Publishes(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(PUBLISH)
+        self.flags = Flags()
+        self.topic_id = 0  # 2 bytes
+        self.topic_name = ""
+        self.msg_id = 0  # 2 bytes
+        self.data = ""
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(PUBLISH)
-    self.Flags = Flags()
-    self.TopicId = 0 # 2 bytes
-    self.TopicName = ""
-    self.MsgId = 0 # 2 bytes
-    self.Data = ""
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = self.flags.pack()
+        if self.flags.topic_id_type in [TOPIC_NORMAL, TOPIC_PREDEFINED, 3]:
+            log.debug(f'Topic id: {self.topic_id}')
+            buffer += write_int_16(self.topic_id)
+        elif self.flags.topic_id_type == TOPIC_SHORTNAME:
+            buffer += (self.topic_name + "    ")[0:2]
+        buffer += write_int_16(self.msg_id) + self.data
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = self.Flags.pack()
-    if self.Flags.TopicIdType in [TOPIC_NORMAL, TOPIC_PREDEFINED, 3]:
-      print "topic id is", self.TopicId
-      buffer += writeInt16(self.TopicId)
-    elif self.Flags.TopicIdType == TOPIC_SHORTNAME:
-      buffer += (self.TopicName + "  ")[0:2]
-    buffer += writeInt16(self.MsgId) + self.Data
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == PUBLISH
+        pos += self.flags.unpack(buffer[pos:])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == PUBLISH
-    pos += self.Flags.unpack(buffer[pos:])
+        self.topic_id = 0
+        self.topic_name = ""
+        if self.flags.topic_id_type in [TOPIC_NORMAL, TOPIC_PREDEFINED]:
+            self.topic_id = read_int_16(buffer[pos:])
+        elif self.flags.topic_id_type == TOPIC_SHORTNAME:
+            self.topic_name = buffer[pos:pos+2]
+        pos += 2
+        self.msg_id = read_int_16(buffer[pos:])
+        pos += 2
+        self.data = buffer[pos:self.mh.length]
 
-    self.TopicId = 0
-    self.TopicName = ""
-    if self.Flags.TopicIdType in [TOPIC_NORMAL, TOPIC_PREDEFINED]:
-      self.TopicId = readInt16(buffer[pos:])
-    elif self.Flags.TopicIdType == TOPIC_SHORTNAME:
-      self.TopicName = buffer[pos:pos+2]
-    pos += 2
-    self.MsgId = readInt16(buffer[pos:])
-    pos += 2
-    self.Data = buffer[pos:self.mh.Length]
+    def __str__(self):
+        return f'{self.mh}, flags {self.flags}, topic_id {self.topic_id}, ' \
+               f'msg_id {self.msg_id}, data {self.data}'
 
-  def __str__(self):
-    return str(self.mh)+", Flags "+str(self.Flags)+", TopicId "+str(self.TopicId)+", MsgId "+str(self.MsgId)+", Data "+self.Data
-
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-         self.Flags == packet.Flags and \
-         self.TopicId == packet.TopicId and \
-         self.MsgId == packet.MsgId and \
-         self.Data == packet.Data
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+               self.flags == packet.flags and \
+               self.topic_id == packet.topic_id and \
+               self.msg_id == packet.msg_id and \
+               self.data == packet.data
 
 
 class Pubacks(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(PUBACK)
+        self.topic_id = 0
+        self.msg_id = 0
+        self.return_code = 0  # 1 byte
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(PUBACK)
-    self.TopicId = 0
-    self.MsgId = 0
-    self.ReturnCode = 0 # 1 byte
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = write_int_16(self.topic_id) + \
+                         write_int_16(self.msg_id) + chr(self.return_code)
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = writeInt16(self.TopicId) + writeInt16(self.MsgId) + chr(self.ReturnCode)
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == PUBACK
+        self.topic_id = read_int_16(buffer[pos:])
+        pos += 2
+        self.msg_id = read_int_16(buffer[pos:])
+        pos += 2
+        self.return_code = ord(buffer[pos])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == PUBACK
-    self.TopicId = readInt16(buffer[pos:])
-    pos += 2
-    self.MsgId = readInt16(buffer[pos:])
-    pos += 2
-    self.ReturnCode = ord(buffer[pos])
+    def __str__(self):
+        return f'{self.mh}, topic_id {self.topic_id}, msg_id {self.msg_id}, ' \
+               f'return_code {self.return_code}'
 
-  def __str__(self):
-    return str(self.mh)+", TopicId "+str(self.TopicId)+" , MsgId "+str(self.MsgId)+", ReturnCode "+str(self.ReturnCode)
-
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.TopicId == packet.TopicId and \
-           self.MsgId == packet.MsgId and \
-           self.ReturnCode == packet.ReturnCode
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+                     self.topic_id == packet.topic_id and \
+                     self.msg_id == packet.msg_id and \
+                     self.return_code == packet.return_code
 
 
 class Pubrecs(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(PUBREC)
+        self.msg_id = 0
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(PUBREC)
-    self.MsgId = 0
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        return self.mh.pack(2) + write_int_16(self.msg_id)
 
-  def pack(self):
-    return self.mh.pack(2) + writeInt16(self.MsgId)
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == PUBREC
+        self.msg_id = read_int_16(buffer[pos:])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == PUBREC
-    self.MsgId = readInt16(buffer[pos:])
+    def __str__(self):
+        return f'{self.mh}, msg_id {self.msg_id}'
 
-  def __str__(self):
-    return str(self.mh)+" , MsgId "+str(self.MsgId)
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and self.msg_id == packet.msg_id
 
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and self.MsgId == packet.MsgId
 
 class Pubrels(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(PUBREL)
+        self.msg_id = 0
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(PUBREL)
-    self.MsgId = 0
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        return self.mh.pack(2) + write_int_16(self.msg_id)
 
-  def pack(self):
-    return self.mh.pack(2) + writeInt16(self.MsgId)
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == PUBREL
+        self.msg_id = read_int_16(buffer[pos:])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == PUBREL
-    self.MsgId = readInt16(buffer[pos:])
+    def __str__(self):
+        return f'{self.mh}, msg_id {self.msg_id}'
 
-  def __str__(self):
-    return str(self.mh)+" , MsgId "+str(self.MsgId)
-
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and self.MsgId == packet.MsgId
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and self.msg_id == packet.msg_id
 
 
 class Pubcomps(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(PUBCOMP)
+        self.msg_id = 0
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(PUBCOMP)
-    self.MsgId = 0
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        return self.mh.pack(2) + write_int_16(self.msg_id)
 
-  def pack(self):
-    return self.mh.pack(2) + writeInt16(self.MsgId)
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == PUBCOMP
+        self.msg_id = read_int_16(buffer[pos:])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == PUBCOMP
-    self.MsgId = readInt16(buffer[pos:])
+    def __str__(self):
+        return f'{self.mh}, msg_id {self.msg_id}'
 
-  def __str__(self):
-    return str(self.mh)+" , MsgId "+str(self.MsgId)
-
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and self.MsgId == packet.MsgId
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and self.msg_id == packet.msg_id
 
 
 class Subscribes(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(SUBSCRIBE)
+        self.flags = Flags()
+        self.msg_id = 0  # 2 bytes
+        self.topic_id = 0  # 2 bytes
+        self.topic_name = ""
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(SUBSCRIBE)
-    self.Flags = Flags()
-    self.MsgId = 0 # 2 bytes
-    self.TopicId = 0 # 2 bytes
-    self.TopicName = ""
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = self.flags.pack() + write_int_16(self.msg_id)
+        if self.flags.topic_id_type == TOPIC_PREDEFINED:
+            buffer += write_int_16(self.topic_id)
+        elif self.flags.topic_id_type in [TOPIC_NORMAL, TOPIC_SHORTNAME]:
+            buffer += self.topic_name
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = self.Flags.pack() + writeInt16(self.MsgId)
-    if self.Flags.TopicIdType == TOPIC_PREDEFINED:
-      buffer += writeInt16(self.TopicId)
-    elif self.Flags.TopicIdType in [TOPIC_NORMAL, TOPIC_SHORTNAME]:
-      buffer += self.TopicName
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == SUBSCRIBE
+        pos += self.flags.unpack(buffer[pos:])
+        self.msg_id = read_int_16(buffer[pos:])
+        pos += 2
+        self.topic_id = 0
+        self.topic_name = ""
+        if self.flags.topic_id_type == TOPIC_PREDEFINED:
+            self.topic_id = read_int_16(buffer[pos:])
+        elif self.flags.topic_id_type in [TOPIC_NORMAL, TOPIC_SHORTNAME]:
+            self.topic_name = buffer[pos:pos+2]
 
+    def __str__(self):
+        buffer = f'{self.mh}, flags {self.flags}, msg_id {self.msg_id}'
+        if self.flags.topic_id_type == 0:
+            buffer += f', topic_name {self.topic_name}'
+        elif self.flags.topic_id_type == 1:
+            buffer += f', topic_id {self.topic_id}'
+        elif self.flags.topic_id_type == 2:
+            buffer += f', topic_id {self.topic_id}'
+        return buffer
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == SUBSCRIBE
-    pos += self.Flags.unpack(buffer[pos:])
-    self.MsgId = readInt16(buffer[pos:])
-    pos += 2
-    self.TopicId = 0
-    self.TopicName = ""
-    if self.Flags.TopicIdType == TOPIC_PREDEFINED:
-      self.TopicId = readInt16(buffer[pos:])
-    elif self.Flags.TopicIdType in [TOPIC_NORMAL, TOPIC_SHORTNAME]:
-      self.TopicName = buffer[pos:pos+2]
+    def __eq__(self, packet):
+        if self.flags.topic_id_type == 0:
+            rc = self.topic_name == packet.topic_name
+        else:
+            rc = self.topic_id == packet.topic_id
 
-  def __str__(self):
-    buffer = str(self.mh)+", Flags "+str(self.Flags)+", MsgId "+str(self.MsgId)
-    if self.Flags.TopicIdType == 0:
-      buffer += ", TopicName "+self.TopicName
-    elif self.Flags.TopicIdType == 1:
-      buffer += ", TopicId "+str(self.TopicId)
-    elif self.Flags.TopicIdType == 2:
-      buffer += ", TopicId "+self.TopicId
-    return buffer
-
-  def __eq__(self, packet):
-    if self.Flags.TopicIdType == 0:
-      rc = self.TopicName == packet.TopicName
-    else:
-      rc = self.TopicId == packet.TopicId
-    return Packets.__eq__(self, packet) and \
-         self.Flags == packet.Flags and \
-         self.MsgId == packet.MsgId and rc
+        return Packets.__eq__(self, packet) and \
+            self.flags == packet.flags and \
+            self.msg_id == packet.msg_id and rc
 
 
 class Subacks(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(SUBACK)
+        self.flags = Flags()  # 1 byte
+        self.topic_id = 0  # 2 bytes
+        self.msg_id = 0  # 2 bytes
+        self.return_code = 0  # 1 byte
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(SUBACK)
-    self.Flags = Flags() # 1 byte
-    self.TopicId = 0 # 2 bytes
-    self.MsgId = 0 # 2 bytes
-    self.ReturnCode = 0 # 1 byte
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = self.flags.pack() + write_int_16(self.topic_id) + \
+                         write_int_16(self.msg_id) + chr(self.return_code)
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = self.Flags.pack() + writeInt16(self.TopicId) + writeInt16(self.MsgId) + chr(self.ReturnCode)
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == SUBACK
+        pos += self.flags.unpack(buffer[pos:])
+        self.topic_id = read_int_16(buffer[pos:])
+        pos += 2
+        self.msg_id = read_int_16(buffer[pos:])
+        pos += 2
+        self.return_code = ord(buffer[pos])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == SUBACK
-    pos += self.Flags.unpack(buffer[pos:])
-    self.TopicId = readInt16(buffer[pos:])
-    pos += 2
-    self.MsgId = readInt16(buffer[pos:])
-    pos += 2
-    self.ReturnCode = ord(buffer[pos])
+    def __str__(self):
+        return f'{self.mh}, flags {self.flags}, topic_id {self.topic_id},' \
+                     f'msg_id {self.msg_id}, return_code {self.return_code}'
 
-  def __str__(self):
-    return str(self.mh)+", Flags "+str(self.Flags)+", TopicId "+str(self.TopicId)+" , MsgId "+str(self.MsgId)+", ReturnCode "+str(self.ReturnCode)
-
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.Flags == packet.Flags and \
-           self.TopicId == packet.TopicId and \
-           self.MsgId == packet.MsgId and \
-           self.ReturnCode == packet.ReturnCode
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+                     self.flags == packet.flags and \
+                     self.topic_id == packet.topic_id and \
+                     self.msg_id == packet.msg_id and \
+                     self.return_code == packet.return_code
 
 
 class Unsubscribes(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(UNSUBSCRIBE)
+        self.flags = Flags()
+        self.msg_id = 0  # 2 bytes
+        self.topic_id = 0  # 2 bytes
+        self.topic_name = ""
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(UNSUBSCRIBE)
-    self.Flags = Flags()
-    self.MsgId = 0 # 2 bytes
-    self.TopicId = 0 # 2 bytes
-    self.TopicName = ""
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = self.flags.pack() + write_int_16(self.msg_id)
+        if self.flags.topic_id_type == 0:
+            buffer += self.topic_name
+        elif self.flags.topic_id_type == 1:
+            buffer += write_int_16(self.topic_id)
+        elif self.flags.topic_id_type == 2:
+            buffer += self.topic_id
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = self.Flags.pack() + writeInt16(self.MsgId)
-    if self.Flags.TopicIdType == 0:
-      buffer += self.TopicName
-    elif self.Flags.TopicIdType == 1:
-      buffer += writeInt16(self.TopicId)
-    elif self.Flags.TopicIdType == 2:
-      buffer += self.TopicId
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == UNSUBSCRIBE
+        pos += self.flags.unpack(buffer[pos:])
+        self.msg_id = read_int_16(buffer[pos:])
+        pos += 2
+        self.topic_id = 0
+        self.topic_name = ""
+        if self.flags.topic_id_type == 0:
+            self.topic_name = buffer[pos:self.mh.length]
+        elif self.flags.topic_id_type == 1:
+            self.topic_id = read_int_16(buffer[pos:])
+        elif self.flags.topic_id_type == 3:
+            self.topic_id = buffer[pos:pos+2]
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == UNSUBSCRIBE
-    pos += self.Flags.unpack(buffer[pos:])
-    self.MsgId = readInt16(buffer[pos:])
-    pos += 2
-    self.TopicId = 0
-    self.TopicName = ""
-    if self.Flags.TopicIdType == 0:
-      self.TopicName = buffer[pos:self.mh.Length]
-    elif self.Flags.TopicIdType == 1:
-      self.TopicId = readInt16(buffer[pos:])
-    elif self.Flags.TopicIdType == 3:
-      self.TopicId = buffer[pos:pos+2]
+    def __str__(self):
+        buffer = f'{self.mh}, flags {self.flags}, msg_id {self.msg_id}'
+        if self.flags.topic_id_type == 0:
+            buffer += f', topic_name {self.topic_name}'
+        elif self.flags.topic_id_type == 1:
+            buffer += f', topic_id {self.topic_id}'
+        elif self.flags.topic_id_type == 2:
+            buffer += f', topic_id {self.topic_id}'
+        return buffer
 
-  def __str__(self):
-    buffer = str(self.mh)+", Flags "+str(self.Flags)+", MsgId "+str(self.MsgId)
-    if self.Flags.TopicIdType == 0:
-      buffer += ", TopicName "+self.TopicName
-    elif self.Flags.TopicIdType == 1:
-      buffer += ", TopicId "+str(self.TopicId)
-    elif self.Flags.TopicIdType == 2:
-      buffer += ", TopicId "+self.TopicId
-    return buffer
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+                 self.flags == packet.flags and \
+                 self.msg_id == packet.msg_id and \
+                 self.topic_id == packet.topic_id and \
+                 self.topic_name == packet.topic_name
 
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-         self.Flags == packet.Flags and \
-         self.MsgId == packet.MsgId and \
-         self.TopicId == packet.TopicId and \
-         self.TopicName == packet.TopicName
 
 class Unsubacks(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(UNSUBACK)
+        self.msg_id = 0
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(UNSUBACK)
-    self.MsgId = 0
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        return self.mh.pack(2) + write_int_16(self.msg_id)
 
-  def pack(self):
-    return self.mh.pack(2) + writeInt16(self.MsgId)
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == UNSUBACK
+        self.msg_id = read_int_16(buffer[pos:])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == UNSUBACK
-    self.MsgId = readInt16(buffer[pos:])
+    def __str__(self):
+        return f'{self.mh}, msg_id {self.msg_id}'
 
-  def __str__(self):
-    return str(self.mh)+" , MsgId "+str(self.MsgId)
-
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and self.MsgId == packet.MsgId
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and self.msg_id == packet.msg_id
 
 
 class Pingreqs(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(PINGREQ)
+        self.client_id = None
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(PINGREQ)
-    self.ClientId = None
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        if self.client_id:
+            buf = self.mh.pack(len(self.client_id)) + self.client_id
+        else:
+            buf = self.mh.pack(0)
+        return buf
 
-  def pack(self):
-    if self.ClientId:
-      buf = self.mh.pack(len(self.ClientId)) + self.ClientId
-    else:
-      buf = self.mh.pack(0)
-    return buf
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == PINGREQ
+        self.client_id = buffer[pos:self.mh.length]
+        if self.client_id == '':
+            self.client_id = None
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == PINGREQ
-    self.ClientId = buffer[pos:self.mh.Length]
-    if self.ClientId == '':
-      self.ClientId = None
+    def __str__(self):
+        buf = str(self.mh)
+        if self.client_id:
+            buf += f', client_id {self.client_id}'
+        return buf
 
-  def __str__(self):
-    buf = str(self.mh)
-    if self.ClientId:
-      buf += ", ClientId "+self.ClientId
-    return buf
-
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.ClientId == packet.ClientId
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+                     self.client_id == packet.client_id
 
 
 class Pingresps(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(PINGRESP)
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(PINGRESP)
-    if buffer != None:
-      self.unpack(buffer)
+    def unpack(self, buffer):
+        # pos = self.mh.unpack(buffer)
+        self.mh.unpack(buffer)
+        assert self.mh.msg_type == PINGRESP
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == PINGRESP
 
 class Disconnects(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(DISCONNECT)
+        self.duration = None
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(DISCONNECT)
-    self.Duration = None
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        if self.duration:
+            buf = self.mh.pack(2) + write_int_16(self.duration)
+        else:
+            buf = self.mh.pack(0)
+        return buf
 
-  def pack(self):
-    if self.Duration:
-      buf = self.mh.pack(2) + writeInt16(self.Duration)
-    else:
-      buf = self.mh.pack(0)
-    return buf
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == DISCONNECT
+        buf = buffer[pos:self.mh.length]
+        if buf == '':
+            self.duration = None
+        else:
+            self.duration = read_int_16(buffer[pos:])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == DISCONNECT
-    buf = buffer[pos:self.mh.Length]
-    if buf == '':
-      self.Duration = None
-    else:
-      self.Duration = readInt16(buffer[pos:])
+    def __str__(self):
+        buf = str(self.mh)
+        if self.duration:
+            buf += f', duration {self.duration}'
+        return buf
 
-  def __str__(self):
-    buf = str(self.mh)
-    if self.Duration:
-      buf += ", Duration "+str(self.Duration)
-    return buf
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+                     self.duration == packet.duration
 
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.Duration == packet.Duration
 
 class WillTopicUpds(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(WILLTOPICUPD)
+        self.flags = Flags()
+        self.will_topic = ""
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(WILLTOPICUPD)
-    self.flags = Flags()
-    self.WillTopic = ""
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = self.flags.pack() + self.will_topic
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = self.flags.pack() + self.WillTopic
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == WILLTOPICUPD
+        pos += self.flags.unpack(buffer[pos:])
+        self.will_topic = buffer[pos:self.mh.length]
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == WILLTOPICUPD
-    pos += self.flags.unpack(buffer[pos:])
-    self.WillTopic = buffer[pos:self.mh.Length]
+    def __str__(self):
+        return f'{self.mh}, flags {self.flags}, will_topic {self.will_topic}'
 
-  def __str__(self):
-    return str(self.mh)+", Flags "+str(self.flags)+", WillTopic "+self.WillTopic
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+                     self.flags == packet.flags and \
+                     self.will_topic == packet.will_topic
 
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.flags == packet.flags and \
-           self.WillTopic == packet.WillTopic
 
 class WillMsgUpds(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(WILLMSGUPD)
+        self.will_msg = ""
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(WILLMSGUPD)
-    self.WillMsg = ""
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        return self.mh.pack(len(self.will_msg)) + self.will_msg
 
-  def pack(self):
-    return self.mh.pack(len(self.WillMsg)) + self.WillMsg
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == WILLMSGUPD
+        self.will_msg = buffer[pos:self.mh.length]
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == WILLMSGUPD
-    self.WillMsg = buffer[pos:self.mh.Length]
+    def __str__(self):
+        return f'{self.mh}, will_msg {self.will_msg}'
 
-  def __str__(self):
-    return str(self.mh)+", WillMsg "+self.WillMsg
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+               self.will_msg == packet.will_msg
 
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.WillMsg == packet.WillMsg
 
 class WillTopicResps(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(WILLTOPICRESP)
+        self.return_code = 0
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(WILLTOPICRESP)
-    self.ReturnCode = 0
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = write_int_16(self.return_code)
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = writeInt16(self.ReturnCode)
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == WILLTOPICRESP
+        self.return_code = read_int_16(buffer[pos:])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == WILLTOPICRESP
-    self.ReturnCode = readInt16(buffer[pos:])
+    def __str__(self):
+        return f'{self.mh}, return_code {self.return_code}'
 
-  def __str__(self):
-    return str(self.mh)+", ReturnCode "+str(self.ReturnCode)
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+               self.return_code == packet.return_code
 
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.ReturnCode == packet.ReturnCode
 
 class WillMsgResps(Packets):
+    def __init__(self, buffer=None):
+        self.mh = MessageHeaders(WILLMSGRESP)
+        self.return_code = 0
+        if buffer is not None:
+            self.unpack(buffer)
 
-  def __init__(self, buffer = None):
-    self.mh = MessageHeaders(WILLMSGRESP)
-    self.ReturnCode = 0
-    if buffer != None:
-      self.unpack(buffer)
+    def pack(self):
+        buffer = write_int_16(self.return_code)
+        return self.mh.pack(len(buffer)) + buffer
 
-  def pack(self):
-    buffer = writeInt16(self.ReturnCode)
-    return self.mh.pack(len(buffer)) + buffer
+    def unpack(self, buffer):
+        pos = self.mh.unpack(buffer)
+        assert self.mh.msg_type == WILLMSGRESP
+        self.return_code = read_int_16(buffer[pos:])
 
-  def unpack(self, buffer):
-    pos = self.mh.unpack(buffer)
-    assert self.mh.MsgType == WILLMSGRESP
-    self.returnCode = readInt16(buffer[pos:])
+    def __str__(self):
+        return f'{self.mh}, return_code {self.return_code}'
 
-  def __str__(self):
-    return str(self.mh)+", ReturnCode "+str(self.ReturnCode)
+    def __eq__(self, packet):
+        return Packets.__eq__(self, packet) and \
+                     self.return_code == packet.return_code
 
-  def __eq__(self, packet):
-    return Packets.__eq__(self, packet) and \
-           self.ReturnCode == packet.ReturnCode
 
 objects = [Advertises, SearchGWs, GWInfos, None,
            Connects, Connacks,
@@ -972,29 +1001,12 @@ objects = [Advertises, SearchGWs, GWInfos, None,
            Pingreqs, Pingresps, Disconnects, None,
            WillTopicUpds, WillTopicResps, WillMsgUpds, WillMsgResps]
 
-def unpackPacket((buffer, address)):
-  if MessageType(buffer) != None:
-    packet = objects[MessageType(buffer)]()
-    packet.unpack(buffer)
-  else:
-    packet = None
-  return packet, address
 
-if __name__ == "__main__":
-  print "Object string representations"
-  for o in objects:
-    if o:
-      print o()
-
-  print "\nComparisons"
-  for o in [Flags] + objects:
-    if o:
-      o1 = o()
-      o2 = o()
-      o2.unpack(o1.pack())
-      if o1 != o2:
-        print "error! ", str(o1.mh) if hasattr(o1, "mh") else o1.__class__.__name__
-        print str(o1)
-        print str(o2)
-      else:
-        print "ok ", str(o1.mh) if hasattr(o1, "mh") else o1.__class__.__name__
+def unpack_packet(*args):
+    buffer, address = args
+    if message_type(buffer) is not None:
+        packet = objects[message_type(buffer)]()
+        packet.unpack(buffer)
+    else:
+        packet = None
+    return packet, address
