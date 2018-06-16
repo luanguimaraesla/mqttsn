@@ -13,7 +13,8 @@
  *
  * Contributors:
  *    Ian Craggs - initial API and implementation and/or initial documentation
- *******************************************************************************/
+ *    Luan Guimarães - refactor and migration to Python 3.6
+ *****************************************************************************/
 """
 
 import socket
@@ -22,8 +23,18 @@ import types
 import struct
 import logging
 
-from . import MQTTSN
-from . import MQTTSNinternal
+from .lib.connects import Connects
+from .lib.disconnects import Disconnects
+from .lib.publishes import Publishes
+from .lib.helpers import unpack_packet, get_packet
+from .lib.registers import Registers
+from .lib.unsubscribes import Unsubscribes
+from .lib.subscribes import Subscribes
+from .lib.names import (
+    CONNACK, TOPIC_NORMAL, TOPIC_SHORTNAME, TOPIC_PREDEFINED,
+    DISCONNECT, REGACK, SUBACK, UNSUBACK
+)
+from . import internal
 
 log = logging.getLogger("mqttsn")
 
@@ -108,19 +119,19 @@ class Client:
         # log.info(f'Connecting to {self.host}:{self.port}')
         self.sock.connect((self.host, self.port))
 
-        connect = MQTTSN.Connects()
+        connect = Connects()
         connect.client_id = self.client_id
         connect.clean_session = clean_session
         connect.keepalive_timer = 0
         self.sock.send(connect.pack())
 
-        response, address = MQTTSN.unpack_packet(MQTTSN.get_packet(self.sock))
-        assert response.mh.msg_type == MQTTSN.CONNACK
+        response, address = unpack_packet(*get_packet(self.sock))
+        assert response.mh.msg_type == CONNACK
 
         self.start_receiver()
 
     def start_receiver(self):
-        self.__receiver = MQTTSNinternal.receivers(self.sock)
+        self.__receiver = internal.receivers(self.sock)
         if self.callback:
             _thread.start_new_thread(self.__receiver, (self.callback,))
 
@@ -135,54 +146,54 @@ class Client:
         return msg
 
     def subscribe(self, topic, qos=2):
-        subscribe = MQTTSN.Subscribes()
+        subscribe = Subscribes()
         subscribe.msg_id = self.__next_msg_id()
 
         if isinstance(topic, types.StringType):
             subscribe.topic_name = topic
             if len(topic) > 2:
-                subscribe.flags.topic_id_type = MQTTSN.TOPIC_NORMAL
+                subscribe.flags.topic_id_type = TOPIC_NORMAL
             else:
-                subscribe.flags.topic_id_type = MQTTSN.TOPIC_SHORTNAME
+                subscribe.flags.topic_id_type = TOPIC_SHORTNAME
         else:
             subscribe.topic_id = topic  # should be int
-            subscribe.flags.topic_id_type = MQTTSN.TOPIC_PREDEFINED
+            subscribe.flags.topic_id_type = TOPIC_PREDEFINED
 
         subscribe.flags.qos = qos
         if self.__receiver:
-            self.__receiver.lookfor(MQTTSN.SUBACK)
+            self.__receiver.lookfor(SUBACK)
         self.sock.send(subscribe.pack())
-        msg = self.waitfor(MQTTSN.SUBACK, subscribe.msg_id)
+        msg = self.waitfor(SUBACK, subscribe.msg_id)
 
         return msg.return_code, msg.topic_id
 
     def unsubscribe(self, topics):
-        unsubscribe = MQTTSN.Unsubscribes()
+        unsubscribe = Unsubscribes()
         unsubscribe.msg_id = self.__next_msg_id()
         unsubscribe.data = topics
         if self.__receiver:
-            self.__receiver.lookfor(MQTTSN.UNSUBACK)
+            self.__receiver.lookfor(UNSUBACK)
         self.sock.send(unsubscribe.pack())
-        self.waitfor(MQTTSN.UNSUBACK, unsubscribe.msg_id)
+        self.waitfor(UNSUBACK, unsubscribe.msg_id)
 
     def register(self, topic_name):
-        register = MQTTSN.Registers()
+        register = Registers()
         register.topic_name = topic_name
         if self.__receiver:
-            self.__receiver.lookfor(MQTTSN.REGACK)
+            self.__receiver.lookfor(REGACK)
         self.sock.send(register.pack())
-        msg = self.waitfor(MQTTSN.REGACK, register.msg_id)
+        msg = self.waitfor(REGACK, register.msg_id)
         return msg.topic_id
 
     def publish(self, topic, payload, qos=0, retained=False):
-        publish = MQTTSN.Publishes()
+        publish = Publishes()
         publish.flags.qos = qos
         publish.flags.retain = retained
         if isinstance(topic, types.StringType):
-            publish.flags.topic_id_type = MQTTSN.TOPIC_SHORTNAME
+            publish.flags.topic_id_type = TOPIC_SHORTNAME
             publish.topic_name = topic
         else:
-            publish.flags.topic_id_type = MQTTSN.TOPIC_NORMAL
+            publish.flags.topic_id_type = TOPIC_NORMAL
             publish.topic_id = topic
         if qos in [-1, 0]:
             publish.msg_id = 0
@@ -195,11 +206,11 @@ class Client:
         return publish.msd_id
 
     def disconnect(self):
-        disconnect = MQTTSN.Disconnects()
+        disconnect = Disconnects()
         if self.__receiver:
-            self.__receiver.lookfor(MQTTSN.DISCONNECT)
+            self.__receiver.lookfor(DISCONNECT)
         self.sock.send(disconnect.pack())
-        self.waitfor(MQTTSN.DISCONNECT)
+        self.waitfor(DISCONNECT)
 
     def stop_receiver(self):
         self.sock.close()  # this will stop the receiver too
@@ -212,19 +223,19 @@ class Client:
 
 
 def publish(topic, payload, retained=False, port=1883, host="localhost"):
-    publish = MQTTSN.Publishes()
+    publish = Publishes()
     publish.flags.qos = 3
     publish.flags.retain = retained
     if isinstance(topic, types.StringType):
         if len(topic) > 2:
-            publish.flags.topic_id_type = MQTTSN.TOPIC_NORMAL
+            publish.flags.topic_id_type = TOPIC_NORMAL
             publish.topic_id = len(topic)
             payload = topic + payload
         else:
-            publish.flags.topic_id_type = MQTTSN.TOPIC_SHORTNAME
+            publish.flags.topic_id_type = TOPIC_SHORTNAME
             publish.topic_name = topic
     else:
-        publish.flags.topic_id_type = MQTTSN.TOPIC_NORMAL
+        publish.flags.topic_id_type = TOPIC_NORMAL
         publish.topic_id = topic
     publish.msg_id = 0
     log.debug(f'payload {payload}')
