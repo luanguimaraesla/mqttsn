@@ -23,12 +23,12 @@ if __name__ == '__main__':
     rc, topic2 = aclient.subscribe("topic2")
     print("topic id for topic2 is", topic2)
 
-    aclient.publish(topic1, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", qos=0)
+    aclient.publish(topic1, "aaaa", qos=0)
     aclient.publish(topic2, "bbbb", qos=0)
 
     aclient.unsubscribe("topic1")
 
-    aclient.publish(topic2, "bbbb", qos=0)
-    aclient.publish(topic1, "aaaa", qos=0)
+    aclient.publish(topic2, "cccc", qos=0)
+    aclient.publish(topic1, "dddd", qos=0)
 
     aclient.disconnect()

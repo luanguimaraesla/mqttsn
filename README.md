@@ -3,43 +3,23 @@
 ### Usage examples
 
 ```python
-mclient = Client("myclientid", host="225.0.18.83", port=1883)
-mclient.registerCallback(Callback())
-mclient.start()
-
-publish("long topic name", "qos -1 start", port=1884)
-
-callback = Callback()
-
-aclient = Client("myclientid", port=1884)
-aclient.registerCallback(callback)
-
-aclient.connect()
-aclient.disconnect()
-
-aclient.connect()
-aclient.subscribe("k ", 2)
-aclient.subscribe("jkjkjkjkj", 2)
-aclient.publish("k ", "qos 0")
-aclient.publish("k ", "qos 1", 1)
-aclient.publish("jkjkjkjkj", "qos 2", 2)
-topicid = aclient.register("jkjkjkjkj")
-#time.sleep(1.0)
-aclient.publish(topicid, "qos 2 - registered topic id", 2)
-#time.sleep(1.0)
-aclient.disconnect()
-publish("long topic name", "qos -1 end", port=1884)
-
-time.sleep(30)
-mclient.stop()
-```
-
-```python 
 from mqttsn.client import Client, Callback
+
+import sys
+
+
+class MyCallback(Callback):
+    def message_arrived(self, topic_name, payload, qos, retained, msgid):
+        print(f'{self} | topic_name: {topic_name} | payload: {payload} | '
+              f'qos {qos} | retained {retained} | msgid {msgid}',
+              file=sys.stderr)
+
+        return True
+
 
 if __name__ == '__main__':
     aclient = Client("linh", port=1883)
-    aclient.register_callback(Callback())
+    aclient.register_callback(MyCallback())
     aclient.connect()
 
     rc, topic1 = aclient.subscribe("topic1")
@@ -53,8 +33,8 @@ if __name__ == '__main__':
 
     aclient.unsubscribe("topic1")
 
-    aclient.publish(topic2, "bbbb", qos=0)
-    aclient.publish(topic1, "aaaa", qos=0)
+    aclient.publish(topic2, "cccc", qos=0)
+    aclient.publish(topic1, "dddd", qos=0)
 
     aclient.disconnect()
 ```

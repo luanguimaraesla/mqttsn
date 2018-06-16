@@ -3,7 +3,7 @@ import logging
 from .packets import Packets
 from .flags import Flags
 from .message_headers import MessageHeaders
-from .helpers import write_int_16, read_int_16
+from .helpers import write_int_16, read_int_16, chr_
 from .names import (
     PUBLISH, TOPIC_PREDEFINED, TOPIC_NORMAL, TOPIC_SHORTNAME, PUBREC,
     PUBREL, PUBCOMP, PUBACK
@@ -139,7 +139,7 @@ class Pubacks(Packets):
 
     def pack(self):
         buffer = write_int_16(self.topic_id) + \
-            write_int_16(self.msg_id) + chr(self.return_code)
+            write_int_16(self.msg_id) + chr_(self.return_code)
         return self.mh.pack(len(buffer)) + buffer
 
     def unpack(self, buffer):
@@ -149,7 +149,7 @@ class Pubacks(Packets):
         pos += 2
         self.msg_id = read_int_16(buffer[pos:])
         pos += 2
-        self.return_code = ord(buffer[pos])
+        self.return_code = buffer[pos]
 
     def __str__(self):
         return f'{self.mh}, topic_id {self.topic_id}, msg_id {self.msg_id}, ' \
