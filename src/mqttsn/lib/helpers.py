@@ -1,4 +1,7 @@
+import logging
 from .objects import get_objects
+
+log = logging.getLogger('helpers')
 
 
 def write_int_16(length):
@@ -8,7 +11,7 @@ def write_int_16(length):
 
 
 def read_int_16(buf):
-    return buf[0]*256 + buf[1]
+    return buf[0] * 256 + buf[1]
 
 
 def get_packet(a_socket):
@@ -16,7 +19,7 @@ def get_packet(a_socket):
     Receive the next packet
     """
     buf, address = a_socket.recvfrom(65535)  # get the first byte fixed header
-    print(f'buf {buf} addr {address} ord {buf[0]}')
+    log.debug(f'buf {buf} addr {address} ord {buf[0]}')
     if buf == "":
         return None
 
@@ -43,13 +46,13 @@ def writeUTF(a_string):
 
 def readUTF(buffer):
     length = read_int_16(buffer)
-    return buffer[2:2+length]
+    return buffer[2:2 + length]
 
 
 def unpack_packet(*args):
     buffer, address = args
     if message_type(buffer) is not None:
-        print(f'{buffer} {message_type} {address}')
+        log.debug(f'{buffer} {message_type} {address}')
         packet = get_objects()[message_type(buffer)]()
         packet.unpack(buffer)
     else:

@@ -114,7 +114,7 @@ class Client:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # self.sock.settimeout(5.0)
 
-        print(f'Connecting to {self.host}:{self.port}')
+        log.info(f'Connecting to {self.host}:{self.port}')
         # log.info(f'Connecting to {self.host}:{self.port}')
         self.sock.connect((self.host, self.port))
 

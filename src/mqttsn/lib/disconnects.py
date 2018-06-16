@@ -25,7 +25,6 @@ class Disconnects(Packets):
         if buf == b'':
             self.duration = None
         else:
-            print(buf)
             self.duration = read_int_16(buffer[pos:])
 
     def __str__(self):
@@ -36,4 +35,4 @@ class Disconnects(Packets):
 
     def __eq__(self, packet):
         return Packets.__eq__(self, packet) and \
-                     self.duration == packet.duration
+            self.duration == packet.duration
