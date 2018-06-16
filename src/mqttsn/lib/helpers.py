@@ -1,4 +1,4 @@
-from .objects import objects
+from .objects import get_objects
 
 
 def write_int_16(length):
@@ -48,7 +48,7 @@ def unpack_packet(*args):
     buffer, address = args
     if message_type(buffer) is not None:
         print(f'{buffer} {message_type} {address}')
-        packet = objects[message_type(buffer)]()
+        packet = get_objects()[message_type(buffer)]()
         packet.unpack(buffer)
     else:
         packet = None

@@ -25,7 +25,7 @@ import logging
 from .lib.publishes import Pubacks, Pubrecs, Pubrels, Pubcomps
 from .lib.helpers import get_packet, unpack_packet
 from .lib.names import (
-    PUBACK, REGISTER, PUBREC, PUBREL, PUBCOMP, TOPICID, PUBLISH, ADVERTISE
+    PUBACK, REGISTER, PUBREC, PUBREL, PUBCOMP, PUBLISH, ADVERTISE, TOPIC_NORMAL
 )
 
 
@@ -162,7 +162,9 @@ class Receivers:
                 data = packet.data
                 if qos == 3:
                     qos = -1
-                    if packet.flags.topic_id_type == TOPICID:
+                    # [FIXME] TOPIC_NORMAL is a workaround to this problem
+                    # it was wrong implemented in the original library
+                    if packet.flags.topic_id_type == TOPIC_NORMAL:
                         topicname = packet.data[:packet.topic_id]
                         data = packet.data[packet.topic_id:]
                 if callback is None:
