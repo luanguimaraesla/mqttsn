@@ -75,7 +75,11 @@ class Receivers:
     def receive(self, callback=None):
         packet = None
         try:
-            packet, address = unpack_packet(*get_packet(self.socket))
+            import sys
+            val = get_packet(self.socket)
+            print(val, file=sys.stderr)
+            packet, address = unpack_packet(*val)
+            print(f'unpacked: {type(packet)}', file=sys.stderr)
         except Exception:
             if sys.exc_info()[0] != socket.timeout:
                 log.error(f'Unexpected exception {sys.exc_info()}')

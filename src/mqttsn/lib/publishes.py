@@ -31,6 +31,8 @@ class Publishes(Packets):
         elif self.flags.topic_id_type == TOPIC_SHORTNAME:
             buffer += bytes((self.topic_name + "    ")[0:2].encode('utf-8'))
         buffer += write_int_16(self.msg_id) + bytes(self.data.encode('utf-8'))
+        import sys
+        print(f'DATAAAAAAAAAAAAAAAAAAAAAAAAAAAA: {self.data}', file=sys.stderr)
         return self.mh.pack(len(buffer)) + buffer
 
     def unpack(self, buffer):
@@ -40,14 +42,20 @@ class Publishes(Packets):
 
         self.topic_id = 0
         self.topic_name = ""
+        import sys
         if self.flags.topic_id_type in [TOPIC_NORMAL, TOPIC_PREDEFINED]:
             self.topic_id = read_int_16(buffer[pos:])
+            print(f'topic id: {self.topic_id}', file=sys.stderr)
         elif self.flags.topic_id_type == TOPIC_SHORTNAME:
-            self.topic_name = buffer[pos:pos+2]
+            self.topic_name = buffer[pos:pos + 2]
+            print(f'topic name {self.topic_name}', file=sys.stderr)
+
         pos += 2
         self.msg_id = read_int_16(buffer[pos:])
         pos += 2
         self.data = buffer[pos:self.mh.length]
+        print(f'buffer: {buffer}', file=sys.stderr)
+        print(f"{self.__str__()}-------------------UNPACKED", file=sys.stderr)
 
     def __str__(self):
         return f'{self.mh}, flags {self.flags}, topic_id {self.topic_id}, ' \

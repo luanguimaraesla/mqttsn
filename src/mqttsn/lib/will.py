@@ -1,6 +1,6 @@
 from .packets import Packets
 from .message_headers import MessageHeaders
-from .helpers import write_int_16, read_int_16
+from .helpers import write_int_16, read_int_16, chr_
 from .flags import Flags
 from .names import (
     WILLMSG, WILLTOPIC, WILLMSGREQ, WILLMSGUPD, WILLMSGRESP,
@@ -29,7 +29,7 @@ class WillTopics(Packets):
             self.unpack(buffer)
 
     def pack(self):
-        buffer = self.flags.pack() + self.will_topic
+        buffer = self.flags.pack() + chr_(self.will_topic)
         return self.mh.pack(len(buffer)) + buffer
 
     def unpack(self, buffer):
@@ -43,8 +43,8 @@ class WillTopics(Packets):
 
     def __eq__(self, packet):
         return Packets.__eq__(self, packet) and \
-               self.flags == packet.flags and \
-               self.will_topic == packet.will_topic
+            self.flags == packet.flags and \
+            self.will_topic == packet.will_topic
 
 
 class WillMsgReqs(Packets):
@@ -67,7 +67,7 @@ class WillMsgs(Packets):
             self.unpack(buffer)
 
     def pack(self):
-        return self.mh.pack(len(self.will_msg)) + self.will_msg
+        return self.mh.pack(len(self.will_msg)) + chr_(self.will_msg)
 
     def unpack(self, buffer):
         pos = self.mh.unpack(buffer)
@@ -79,7 +79,7 @@ class WillMsgs(Packets):
 
     def __eq__(self, packet):
         return Packets.__eq__(self, packet) and \
-                     self.will_msg == packet.will_msg
+            self.will_msg == packet.will_msg
 
 
 class WillTopicUpds(Packets):
@@ -91,7 +91,7 @@ class WillTopicUpds(Packets):
             self.unpack(buffer)
 
     def pack(self):
-        buffer = self.flags.pack() + self.will_topic
+        buffer = self.flags.pack() + chr_(self.will_topic)
         return self.mh.pack(len(buffer)) + buffer
 
     def unpack(self, buffer):
@@ -105,8 +105,8 @@ class WillTopicUpds(Packets):
 
     def __eq__(self, packet):
         return Packets.__eq__(self, packet) and \
-                     self.flags == packet.flags and \
-                     self.will_topic == packet.will_topic
+            self.flags == packet.flags and \
+            self.will_topic == packet.will_topic
 
 
 class WillMsgUpds(Packets):
@@ -117,7 +117,7 @@ class WillMsgUpds(Packets):
             self.unpack(buffer)
 
     def pack(self):
-        return self.mh.pack(len(self.will_msg)) + self.will_msg
+        return self.mh.pack(len(self.will_msg)) + chr_(self.will_msg)
 
     def unpack(self, buffer):
         pos = self.mh.unpack(buffer)
@@ -129,7 +129,7 @@ class WillMsgUpds(Packets):
 
     def __eq__(self, packet):
         return Packets.__eq__(self, packet) and \
-               self.will_msg == packet.will_msg
+            self.will_msg == packet.will_msg
 
 
 class WillTopicResps(Packets):
@@ -153,7 +153,7 @@ class WillTopicResps(Packets):
 
     def __eq__(self, packet):
         return Packets.__eq__(self, packet) and \
-               self.return_code == packet.return_code
+            self.return_code == packet.return_code
 
 
 class WillMsgResps(Packets):
@@ -177,4 +177,4 @@ class WillMsgResps(Packets):
 
     def __eq__(self, packet):
         return Packets.__eq__(self, packet) and \
-                     self.return_code == packet.return_code
+            self.return_code == packet.return_code

@@ -1,7 +1,7 @@
 import logging
 
 from .names import packet_names
-from .helpers import write_int_16, read_int_16
+from .helpers import write_int_16, read_int_16, chr_
 
 log = logging.getLogger('message_headers')
 
@@ -27,18 +27,18 @@ class MessageHeaders:
         """
         # length does not yet include the length or msgtype bytes we
         # are going to add
-        buffer = self.encode(length) + chr(self.msg_type)
-        return bytes(buffer.encode('utf-8'))
+        buffer = self.encode(length) + chr_(self.msg_type)
+        return buffer
 
     def encode(self, length):
         self.length = length + 2
         assert 2 <= self.length <= 65535
         if self.length < 256:
-            buffer = chr(self.length)
+            buffer = chr_(self.length)
             log.debug(f'Encoding length {self.length}')
         else:
             self.length += 2
-            buffer = chr(1) + write_int_16(self.length)
+            buffer = chr_(1) + write_int_16(self.length)
         return buffer
 
     def unpack(self, buffer):

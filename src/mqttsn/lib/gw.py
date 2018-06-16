@@ -1,6 +1,6 @@
 from .packets import Packets
 from .message_headers import MessageHeaders
-from .helpers import write_int_16, read_int_16
+from .helpers import write_int_16, read_int_16, chr_
 from .names import SEARCHGW, GWINFO
 
 
@@ -34,7 +34,7 @@ class GWInfos(Packets):
             self.unpack(buffer)
 
     def pack(self):
-        buffer = chr(self.gw_id)
+        buffer = chr_(self.gw_id)
         if self.gw_add:
             buffer += self.gw_add
         buffer = self.mh.pack(len(buffer)) + buffer

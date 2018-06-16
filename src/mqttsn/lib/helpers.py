@@ -5,9 +5,7 @@ log = logging.getLogger('helpers')
 
 
 def write_int_16(length):
-    return bytes(
-        (chr(length // 256) + chr(length % 256)).encode('utf-8')
-    )
+    return chr_(length // 256) + chr_(length % 256)
 
 
 def read_int_16(buf):
@@ -42,6 +40,10 @@ def message_type(buf):
 
 def writeUTF(a_string):
     return write_int_16(len(a_string)) + a_string
+
+
+def chr_(val):
+    return bytes((val,))
 
 
 def readUTF(buffer):

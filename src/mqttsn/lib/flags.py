@@ -1,3 +1,6 @@
+from .helpers import chr_
+
+
 class Flags:
     def __init__(self):
         self.dup = False          # 1 bit
@@ -9,11 +12,11 @@ class Flags:
 
     def __eq__(self, flags):
         return self.dup == flags.dup and \
-             self.qos == flags.qos and \
-             self.retain == flags.retain and \
-             self.will == flags.will and \
-             self.clean_session == flags.clean_session and \
-             self.topic_id_type == flags.topic_id_type
+            self.qos == flags.qos and \
+            self.retain == flags.retain and \
+            self.will == flags.will and \
+            self.clean_session == flags.clean_session and \
+            self.topic_id_type == flags.topic_id_type
 
     def __ne__(self, flags):
         return not self.__eq__(flags)
@@ -31,18 +34,14 @@ class Flags:
         """
         Pack data into string buffer ready for transmission down socket
         """
-        buffer = (
-            chr(
-                (self.dup << 7) |
-                (self.qos << 5) |
-                (self.retain << 4) |
-                (self.will << 3) |
-                (self.clean_session << 2) |
-                self.topic_id_type
-            )
+        return chr_(
+            (self.dup << 7) |
+            (self.qos << 5) |
+            (self.retain << 4) |
+            (self.will << 3) |
+            (self.clean_session << 2) |
+            self.topic_id_type
         )
-
-        return bytes(buffer.encode('utf-8'))
 
     def unpack(self, buffer):
         """

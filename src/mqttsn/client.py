@@ -200,7 +200,7 @@ class Client:
             publish.msg_id = self.__next_msg_id()
             log.debug(f'Message ID: {publish.msg_id}')
             self.__receiver.outMsgs[publish.msg_id] = publish
-        publish.Data = payload
+        publish.data = payload
         self.sock.send(publish.pack())
         return publish.msg_id
 

@@ -1,6 +1,7 @@
 from .packets import Packets
 from .names import PINGREQ, PINGRESP
 from .message_headers import MessageHeaders
+from .helpers import chr_
 
 
 class Pingreqs(Packets):
@@ -12,7 +13,7 @@ class Pingreqs(Packets):
 
     def pack(self):
         if self.client_id:
-            buf = self.mh.pack(len(self.client_id)) + self.client_id
+            buf = self.mh.pack(len(self.client_id)) + chr_(self.client_id)
         else:
             buf = self.mh.pack(0)
         return buf
@@ -32,7 +33,7 @@ class Pingreqs(Packets):
 
     def __eq__(self, packet):
         return Packets.__eq__(self, packet) and \
-                     self.client_id == packet.client_id
+            self.client_id == packet.client_id
 
 
 class Pingresps(Packets):
