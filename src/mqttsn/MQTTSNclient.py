@@ -16,13 +16,14 @@
  *******************************************************************************/
 """
 
-import MQTTSN
 import socket
-import MQTTSNinternal
-import thread
+import _thread
 import types
 import struct
 import logging
+
+from . import MQTTSN
+from . import MQTTSNinternal
 
 log = logging.getLogger("mqttsn")
 
@@ -119,7 +120,7 @@ class Client:
     def start_receiver(self):
         self.__receiver = MQTTSNinternal.receivers(self.sock)
         if self.callback:
-            thread.start_new_thread(self.__receiver, (self.callback,))
+            _thread.start_new_thread(self.__receiver, (self.callback,))
 
     def waitfor(self, msg_type, msg_id=None):
         if self.__receiver:

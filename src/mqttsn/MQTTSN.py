@@ -48,7 +48,7 @@ TOPIC_NORMAL, TOPIC_PREDEFINED, TOPIC_SHORTNAME = range(3)
 
 
 def write_int_16(length):
-    return chr(length / 256) + chr(length % 256)
+    return chr(length // 256) + chr(length % 256)
 
 
 def read_int_16(buf):
@@ -86,7 +86,7 @@ class Flags:
         self.qos = 0              # 2 bits
         self.retain = False       # 1 bit
         self.will = False         # 1 bit
-        self.clean_sessioin = True  # 1 bit
+        self.clean_session = True  # 1 bit
         self.topic_id_type = 0      # 2 bits
 
     def __eq__(self, flags):
