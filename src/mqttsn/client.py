@@ -188,18 +188,21 @@ class Client:
         publish = Publishes()
         publish.flags.qos = qos
         publish.flags.retain = retained
+
         if isinstance(topic, str):
+            # [FIXME] should accept a TOPIC_NORMAL correctly
             publish.flags.topic_id_type = TOPIC_SHORTNAME
             publish.topic_name = topic
         else:
             publish.flags.topic_id_type = TOPIC_NORMAL
             publish.topic_id = topic
+
         if qos in [-1, 0]:
             publish.msg_id = 0
         else:
             publish.msg_id = self.__next_msg_id()
             log.debug(f'Message ID: {publish.msg_id}')
-            self.__receiver.outMsgs[publish.msg_id] = publish
+            self.__receiver.out_msgs[publish.msg_id] = publish
         publish.data = payload
         self.sock.send(publish.pack())
         return publish.msg_id
@@ -238,7 +241,7 @@ def publish(topic, payload, retained=False, port=1883, host="localhost"):
         publish.topic_id = topic
     publish.msg_id = 0
     log.debug(f'payload {payload}')
-    publish.Data = payload
+    publish.data = payload
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.sendto(publish.pack(), (host, port))
     sock.close()
