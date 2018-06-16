@@ -1,0 +1,16 @@
+sudo: false
+language: python
+python:
+  - "3.6"
+
+# Package installation
+install:
+  - pip install tox-travis codecov
+
+# Run tests
+script:
+  tox
+
+# Register code coverage in coveralls
+after_success:
+  codecov
