@@ -19,7 +19,6 @@
 
 import socket
 import _thread
-import types
 import struct
 import logging
 
@@ -70,7 +69,7 @@ class Client:
         self.client_id = client_id
         self.host = host
         self.port = port
-        self.msgid = 1
+        self.msg_id = 1
         self.callback = None
         self.__receiver = None
 
@@ -103,7 +102,7 @@ class Client:
         if len(self.__receiver.out_msgs) >= 65535:
             raise "No slots left!!"
         else:
-            self.msgid = get_wrapped_msg_id()
+            self.msg_id = get_wrapped_msg_id()
             while self.msg_id in self.__receiver.out_msgs:
                 self.msg_id = get_wrapped_msg_id()
         return self.msg_id
@@ -131,7 +130,7 @@ class Client:
         self.start_receiver()
 
     def start_receiver(self):
-        self.__receiver = internal.receivers(self.sock)
+        self.__receiver = internal.Receivers(self.sock)
         if self.callback:
             _thread.start_new_thread(self.__receiver, (self.callback,))
 
@@ -149,7 +148,7 @@ class Client:
         subscribe = Subscribes()
         subscribe.msg_id = self.__next_msg_id()
 
-        if isinstance(topic, types.StringType):
+        if isinstance(topic, str):
             subscribe.topic_name = topic
             if len(topic) > 2:
                 subscribe.flags.topic_id_type = TOPIC_NORMAL
@@ -189,7 +188,7 @@ class Client:
         publish = Publishes()
         publish.flags.qos = qos
         publish.flags.retain = retained
-        if isinstance(topic, types.StringType):
+        if isinstance(topic, str):
             publish.flags.topic_id_type = TOPIC_SHORTNAME
             publish.topic_name = topic
         else:
@@ -203,7 +202,7 @@ class Client:
             self.__receiver.outMsgs[publish.msg_id] = publish
         publish.Data = payload
         self.sock.send(publish.pack())
-        return publish.msd_id
+        return publish.msg_id
 
     def disconnect(self):
         disconnect = Disconnects()
@@ -226,7 +225,7 @@ def publish(topic, payload, retained=False, port=1883, host="localhost"):
     publish = Publishes()
     publish.flags.qos = 3
     publish.flags.retain = retained
-    if isinstance(topic, types.StringType):
+    if isinstance(topic, str):
         if len(topic) > 2:
             publish.flags.topic_id_type = TOPIC_NORMAL
             publish.topic_id = len(topic)

@@ -17,9 +17,9 @@ class Connects(Packets):
 
     def pack(self):
         buffer = self.flags.pack()
-        buffer += bytes((chr(self.protocol_id) +
-                         write_int_16(self.duration) +
-                         self.client_id).encode('utf-8'))
+        buffer += bytes(chr(self.protocol_id).encode('utf-8'))
+        buffer += write_int_16(self.duration)
+        buffer += bytes(self.client_id.encode('utf-8'))
         return self.mh.pack(len(buffer)) + buffer
 
     def unpack(self, buffer):
@@ -61,7 +61,7 @@ class Connacks(Packets):
     def unpack(self, buffer):
         pos = self.mh.unpack(buffer)
         assert self.mh.msg_type == CONNACK
-        self.return_code = ord(buffer[pos])
+        self.return_code = buffer[pos]
 
     def __str__(self):
         return f'{self.mh}, return_code {self.return_code}'

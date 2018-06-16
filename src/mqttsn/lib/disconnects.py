@@ -22,9 +22,10 @@ class Disconnects(Packets):
         pos = self.mh.unpack(buffer)
         assert self.mh.msg_type == DISCONNECT
         buf = buffer[pos:self.mh.length]
-        if buf == '':
+        if buf == b'':
             self.duration = None
         else:
+            print(buf)
             self.duration = read_int_16(buffer[pos:])
 
     def __str__(self):

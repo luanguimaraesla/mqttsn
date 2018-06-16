@@ -29,8 +29,8 @@ class Publishes(Packets):
             log.debug(f'Topic id: {self.topic_id}')
             buffer += write_int_16(self.topic_id)
         elif self.flags.topic_id_type == TOPIC_SHORTNAME:
-            buffer += (self.topic_name + "    ")[0:2]
-        buffer += write_int_16(self.msg_id) + self.data
+            buffer += bytes((self.topic_name + "    ")[0:2].encode('utf-8'))
+        buffer += write_int_16(self.msg_id) + bytes(self.data.encode('utf-8'))
         return self.mh.pack(len(buffer)) + buffer
 
     def unpack(self, buffer):

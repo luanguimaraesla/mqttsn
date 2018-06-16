@@ -2,11 +2,13 @@ from .objects import get_objects
 
 
 def write_int_16(length):
-    return chr(length // 256) + chr(length % 256)
+    return bytes(
+        (chr(length // 256) + chr(length % 256)).encode('utf-8')
+    )
 
 
 def read_int_16(buf):
-    return ord(buf[0])*256 + ord(buf[1])
+    return buf[0]*256 + buf[1]
 
 
 def get_packet(a_socket):

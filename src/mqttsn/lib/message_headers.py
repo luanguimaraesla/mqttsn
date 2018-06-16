@@ -45,14 +45,12 @@ class MessageHeaders:
         """
         Unpack data from string buffer into separate fields
         """
-        buffer = buffer.decode('utf-8')
         (self.length, _bytes) = self.decode(buffer)
-        self.msg_type = ord(buffer[_bytes])
+        self.msg_type = buffer[_bytes]
         return _bytes + 1
 
     def decode(self, buffer):
-        buffer = buffer.decode('utf-8')
-        value = ord(buffer[0])
+        value = buffer[0]
         if value > 1:
             _bytes = 1
         else:

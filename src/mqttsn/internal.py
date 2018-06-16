@@ -75,9 +75,7 @@ class Receivers:
     def receive(self, callback=None):
         packet = None
         try:
-            packet, address = unpack_packet(
-                get_packet(self.socket)
-            )
+            packet, address = unpack_packet(*get_packet(self.socket))
         except Exception:
             if sys.exc_info()[0] != socket.timeout:
                 log.error(f'Unexpected exception {sys.exc_info()}')

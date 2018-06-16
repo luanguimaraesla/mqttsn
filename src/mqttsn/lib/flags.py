@@ -48,8 +48,7 @@ class Flags:
         """
         Unpack data from string buffer into separate fields
         """
-        buffer = buffer.decode('utf-8')
-        b0 = ord(buffer[0])
+        b0 = buffer[0]
         self.dup = ((b0 >> 7) & 0x01) == 1
         self.qos = (b0 >> 5) & 0x03
         self.retain = ((b0 >> 4) & 0x01) == 1

@@ -23,7 +23,7 @@ class Subscribes(Packets):
         if self.flags.topic_id_type == TOPIC_PREDEFINED:
             buffer += write_int_16(self.topic_id)
         elif self.flags.topic_id_type in [TOPIC_NORMAL, TOPIC_SHORTNAME]:
-            buffer += self.topic_name
+            buffer += bytes(self.topic_name.encode('utf-8'))
         return self.mh.pack(len(buffer)) + buffer
 
     def unpack(self, buffer):
@@ -83,7 +83,7 @@ class Subacks(Packets):
         pos += 2
         self.msg_id = read_int_16(buffer[pos:])
         pos += 2
-        self.return_code = ord(buffer[pos])
+        self.return_code = buffer[pos]
 
     def __str__(self):
         return f'{self.mh}, flags {self.flags}, topic_id {self.topic_id},' \

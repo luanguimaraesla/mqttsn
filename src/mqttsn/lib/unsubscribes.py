@@ -18,11 +18,11 @@ class Unsubscribes(Packets):
     def pack(self):
         buffer = self.flags.pack() + write_int_16(self.msg_id)
         if self.flags.topic_id_type == 0:
-            buffer += self.topic_name
+            buffer += bytes(self.topic_name.encode('utf-8'))
         elif self.flags.topic_id_type == 1:
             buffer += write_int_16(self.topic_id)
         elif self.flags.topic_id_type == 2:
-            buffer += self.topic_id
+            buffer += bytes(self.topic_id.encode('utf-8'))
         return self.mh.pack(len(buffer)) + buffer
 
     def unpack(self, buffer):

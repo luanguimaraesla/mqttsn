@@ -1,7 +1,4 @@
 class Packets:
-    def pack(self):
-        return self.mh.pack(0)
-
     def __str__(self):
         return str(self.mh)
 
@@ -10,3 +7,9 @@ class Packets:
 
     def __ne__(self, packet):
         return not self.__eq__(packet)
+
+    def pack(self):
+        return self.mh.pack(0)
+
+    def unpack(self):
+        raise NotImplementedError
