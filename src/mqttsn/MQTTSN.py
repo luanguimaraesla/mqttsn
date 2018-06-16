@@ -124,12 +124,13 @@ class Flags:
             )
         )
 
-        return buffer
+        return bytes(buffer.encode('utf-8'))
 
     def unpack(self, buffer):
         """
         Unpack data from string buffer into separate fields
         """
+        buffer = buffer.decode('utf-8')
         b0 = ord(buffer[0])
         self.dup = ((b0 >> 7) & 0x01) == 1
         self.qos = (b0 >> 5) & 0x03
@@ -163,7 +164,7 @@ class MessageHeaders:
         # length does not yet include the length or msgtype bytes we
         # are going to add
         buffer = self.encode(length) + chr(self.msg_type)
-        return buffer
+        return bytes(buffer.encode('utf-8'))
 
     def encode(self, length):
         self.length = length + 2
@@ -180,18 +181,20 @@ class MessageHeaders:
         """
         Unpack data from string buffer into separate fields
         """
-        (self.length, bytes) = self.decode(buffer)
-        self.msg_type = ord(buffer[bytes])
-        return bytes + 1
+        buffer = buffer.decode('utf-8')
+        (self.length, _bytes) = self.decode(buffer)
+        self.msg_type = ord(buffer[_bytes])
+        return _bytes + 1
 
     def decode(self, buffer):
+        buffer = buffer.decode('utf-8')
         value = ord(buffer[0])
         if value > 1:
-            bytes = 1
+            _bytes = 1
         else:
             value = read_int_16(buffer[1:])
-            bytes = 3
-        return (value, bytes)
+            _bytes = 3
+        return (value, _bytes)
 
 
 def writeUTF(a_string):
@@ -309,11 +312,14 @@ class Connects(Packets):
             self.unpack(buffer)
 
     def pack(self):
-        buffer = self.flags.pack() + chr(self.protocol_id) + \
-                         write_int_16(self.duration) + self.client_id
+        buffer = self.flags.pack()
+        buffer += bytes((chr(self.protocol_id) +
+                         write_int_16(self.duration) +
+                         self.client_id).encode('utf-8'))
         return self.mh.pack(len(buffer)) + buffer
 
     def unpack(self, buffer):
+        buffer = buffer.decode('utf-8')
         pos = self.mh.unpack(buffer)
         assert self.mh.msg_type == CONNECT
         pos += self.flags.unpack(buffer[pos])
