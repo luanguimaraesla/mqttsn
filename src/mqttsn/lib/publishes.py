@@ -30,7 +30,15 @@ class Publishes(Packets):
             buffer += write_int_16(self.topic_id)
         elif self.flags.topic_id_type == TOPIC_SHORTNAME:
             buffer += bytes((self.topic_name + "    ")[0:2].encode('utf-8'))
-        buffer += write_int_16(self.msg_id) + bytes(self.data.encode('utf-8'))
+        buffer += write_int_16(self.msg_id)
+
+        if isinstance(self.data, str):
+            buffer += bytes(self.data.encode('utf-8'))
+        elif isinstance(self.data, bytes):
+            buffer += self.data
+        else:
+            raise TypeError('data should be str or bytes')
+
         return self.mh.pack(len(buffer)) + buffer
 
     def unpack(self, buffer):

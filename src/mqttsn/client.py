@@ -21,6 +21,7 @@ import socket
 import _thread
 import struct
 import logging
+import uuid
 
 from .lib.connects import Connects
 from .lib.disconnects import Disconnects
@@ -65,13 +66,16 @@ class Callback:
 
 
 class Client:
-    def __init__(self, client_id, host="localhost", port=1883):
-        self.client_id = client_id
+    def __init__(self, client_id=None, host="localhost", port=1883):
+        self.client_id = client_id or self._gen_uuid()
         self.host = host
         self.port = port
         self.msg_id = 1
         self.callback = None
         self.__receiver = None
+
+    def _gen_uuid(self):
+        return uuid.uuid4().hex
 
     def start(self):
         self.sock = socket.socket(
@@ -144,7 +148,7 @@ class Client:
                 msg = self.__receiver.receive()
         return msg
 
-    def subscribe(self, topic, qos=2):
+    def subscribe(self, topic, qos=0):
         subscribe = Subscribes()
         subscribe.msg_id = self.__next_msg_id()
 

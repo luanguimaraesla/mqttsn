@@ -1,3 +1,5 @@
+import logging
+
 from .packets import Packets
 from .message_headers import MessageHeaders
 from .flags import Flags
@@ -6,6 +8,9 @@ from .names import (
     SUBSCRIBE, TOPIC_PREDEFINED, TOPIC_NORMAL,
     TOPIC_SHORTNAME, SUBACK
 )
+
+
+log = logging.getLogger('subscribes')
 
 
 class Subscribes(Packets):
