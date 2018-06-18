@@ -68,8 +68,8 @@ class Callback:
 class Client:
     def __init__(self, client_id=None, host="localhost", port=1883):
         self.client_id = client_id or self._gen_uuid()
-        self.host = host
-        self.port = port
+        self.host_ = host
+        self.port_ = port
         self.msg_id = 1
         self.callback = None
         self.__receiver = None
@@ -85,8 +85,8 @@ class Client:
         )
 
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind((self.host, self.port))
-        mreq = struct.pack("4sl", socket.inet_aton(self.host),
+        self.sock.bind((self.host_, self.port_))
+        mreq = struct.pack("4sl", socket.inet_aton(self.host_),
                            socket.INADDR_ANY)
 
         self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
@@ -118,9 +118,9 @@ class Client:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # self.sock.settimeout(5.0)
 
-        log.info(f'Connecting to {self.host}:{self.port}')
-        # log.info(f'Connecting to {self.host}:{self.port}')
-        self.sock.connect((self.host, self.port))
+        log.info(f'Connecting to {self.host_}:{self.port_}')
+        # log.info(f'Connecting to {self.host_}:{self.port_}')
+        self.sock.connect((self.host_, self.port_))
 
         connect = Connects()
         connect.client_id = self.client_id

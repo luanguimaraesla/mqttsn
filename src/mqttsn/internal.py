@@ -157,7 +157,7 @@ class Receivers:
             """
             if packet.flags.qos in [0, 3]:
                 qos = packet.flags.qos
-                topicname = packet.topic_name
+                topicname = packet.topic_name.decode('utf-8')
                 data = packet.data
                 if qos == 3:
                     qos = -1
