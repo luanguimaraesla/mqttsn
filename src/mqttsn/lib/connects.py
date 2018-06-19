@@ -2,7 +2,7 @@ from .packets import Packets
 from .message_headers import MessageHeaders
 from .names import CONNECT, CONNACK
 from .flags import Flags
-from .helpers import write_int_16, read_int_16
+from .helpers import write_int_16, read_int_16, chr_
 
 
 class Connects(Packets):
@@ -17,9 +17,9 @@ class Connects(Packets):
 
     def pack(self):
         buffer = self.flags.pack()
-        buffer += bytes(chr(self.protocol_id).encode('utf-8'))
+        buffer += chr_(self.protocol_id)
         buffer += write_int_16(self.duration)
-        buffer += bytes(self.client_id.encode('utf-8'))
+        buffer += self.client_id
         return self.mh.pack(len(buffer)) + buffer
 
     def unpack(self, buffer):
@@ -27,7 +27,7 @@ class Connects(Packets):
         pos = self.mh.unpack(buffer)
         assert self.mh.msg_type == CONNECT
         pos += self.flags.unpack(buffer[pos])
-        self.protocol_id = ord(buffer[pos])
+        self.protocol_id = buffer[pos]
         pos += 1
         self.duration = read_int_16(buffer[pos:])
         pos += 2
@@ -40,10 +40,10 @@ class Connects(Packets):
 
     def __eq__(self, packet):
         rc = Packets.__eq__(self, packet) and \
-             self.flags == packet.flags and \
-             self.protocol_id == packet.protocol_id and \
-             self.duration == packet.duration and \
-             self.client_id == packet.client_id
+            self.flags == packet.flags and \
+            self.protocol_id == packet.protocol_id and \
+            self.duration == packet.duration and \
+            self.client_id == packet.client_id
         return rc
 
 
@@ -68,4 +68,4 @@ class Connacks(Packets):
 
     def __eq__(self, packet):
         return Packets.__eq__(self, packet) and \
-                     self.return_code == packet.return_code
+            self.return_code == packet.return_code

@@ -75,7 +75,12 @@ class Client:
         self.__receiver = None
 
     def _gen_uuid(self):
-        return uuid.uuid4().hex
+        """
+        Returns:
+            The client id which is a 1-23, character long string which uniquely
+            identifies the client to the server.
+        """
+        return uuid.uuid4().hex.encode('utf-8')[:23]
 
     def start(self):
         self.sock = socket.socket(
@@ -166,9 +171,13 @@ class Client:
         if self.__receiver:
             self.__receiver.lookfor(SUBACK)
         self.sock.send(subscribe.pack())
+        print(f"Message SUBACK ID: {subscribe.msg_id}")
         msg = self.waitfor(SUBACK, subscribe.msg_id)
 
-        return msg.return_code, msg.topic_id
+        try:
+            return msg.return_code, msg.topic_id
+        except AttributeError:
+            log.error('No SUBACK message received')
 
     def unsubscribe(self, topics):
         unsubscribe = Unsubscribes()
@@ -208,8 +217,8 @@ class Client:
             log.debug(f'Message ID: {publish.msg_id}')
             self.__receiver.out_msgs[publish.msg_id] = publish
         publish.data = payload
-        import sys
-        print(f'PUBLISH: {publish.__str__()}', file=sys.stderr)
+        print(f'PUBLISH: {publish.__str__()}')
+        print(f'PAYLOAD LEN: {len(payload)}')
         self.sock.send(publish.pack())
         return publish.msg_id
 

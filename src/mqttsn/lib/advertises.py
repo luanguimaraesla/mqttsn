@@ -19,7 +19,7 @@ class Advertises(Packets):
     def unpack(self, buffer):
         pos = self.mh.unpack(buffer)
         assert self.mh.msg_type == ADVERTISE
-        self.gw_id = ord(buffer[pos])
+        self.gw_id = buffer[pos]
         pos += 1
         self.duration = read_int_16(buffer[pos:])
 

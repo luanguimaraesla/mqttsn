@@ -48,6 +48,16 @@ class Receivers:
         self.pubrel = Pubrels()
         self.pubcomp = Pubcomps()
 
+        self._actions = {
+            PUBACK: self._process_puback,
+            REGISTER: self._process_register,
+            PUBREC: self._process_pubrec,
+            PUBREL: self._process_pubrel,
+            PUBCOMP: self._process_pubcomp,
+            PUBLISH: self._process_publish,
+            ADVERTISE: self._process_advertise,
+        }
+
     def lookfor(self, msg_type):
         self.observe = msg_type
 
@@ -85,111 +95,14 @@ class Receivers:
             time.sleep(0.1)
             return
 
-        log.debug(f'Packet: {packet}')
+        log.debug(f'Chegou Packet: {packet}')
 
         if self.observe == packet.mh.msg_type:
             log.debug(f'Observed packet: {packet}')
             self.observed.append(packet)
 
-        elif packet.mh.msg_type == ADVERTISE:
-            if hasattr(callback, "advertise"):
-                callback.advertise(address, packet.gw_id, packet.duration)
-
-        elif packet.mh.msg_type == REGISTER:
-            if callback and hasattr(callback, "register"):
-                callback.register(packet.topic_id, packet.topic_name)
-
-        elif packet.mh.msg_type == PUBACK:
-            log.debug("Check if we are expecting a puback")
-            if packet.msg_id in self.out_msgs and \
-               self.out_msgs[packet.msg_id].flags.qos == 1:
-                del self.out_msgs[packet.msg_id]
-                if hasattr(callback, "published"):
-                    callback.published(packet.msg_id)
-            else:
-                raise Exception(
-                    f'No qos 1 message with message id {packet.msg_id} sent'
-                )
-
-        elif packet.mh.msg_type == PUBREC:
-            if packet.msg_id in self.out_msgs:
-                self.pubrel.msg_id = packet.msg_id
-                self.socket.send(self.pubrel.pack())
-            else:
-                raise Exception(
-                    'PUBREC received for unknown msg_id: {packet.msg_id}'
-                )
-
-        elif packet.mh.msg_type == PUBREL:
-            log.debug("Release qos 2 publication to client, & send PUBCOMP")
-            msgid = packet.msg_id
-            if msgid not in self.in_msgs:
-                pass  # what should we do here?
-            else:
-                pub = self.in_msgs[packet.msg_id]
-                if callback is None or \
-                    callback.message_arrived(
-                        pub.topic_name, pub.data, 2,
-                        pub.flags.retain, pub.msg_id):
-                    del self.in_msgs[packet.msg_id]
-                    self.pubcomp.msg_id = packet.msg_id
-                    self.socket.send(self.pubcomp.pack())
-                if callback is None:
-                    return (pub.topic_name, pub.data, 2,
-                            pub.flags.retain, pub.msg_id)
-
-        elif packet.mh.msg_type == PUBCOMP:
-            """
-            Finished with this message id
-            """
-            if packet.msg_id in self.out_msgs:
-                del self.out_msgs[packet.msg_id]
-                if hasattr(callback, "published"):
-                    callback.published(packet.msg_id)
-            else:
-                raise Exception(
-                    f'PUBCOMP received for unknown msg_id: {packet.msg_id}'
-                )
-
-        elif packet.mh.msg_type == PUBLISH:
-            """
-            Finished with this message id
-            """
-            if packet.flags.qos in [0, 3]:
-                qos = packet.flags.qos
-                topicname = packet.topic_name.decode('utf-8')
-                data = packet.data
-                log.debug(f'DATA ON MQTTSN: {data}')
-                if qos == 3:
-                    qos = -1
-                    # [FIXME] TOPIC_NORMAL is a workaround to this problem
-                    # it was wrong implemented in the original library
-                    if packet.flags.topic_id_type == TOPIC_NORMAL:
-                        topicname = packet.data[:packet.topic_id]
-                        data = packet.data[packet.topic_id:]
-                if callback is None:
-                    return (topicname, data, qos,
-                            packet.flags.retain, packet.msg_id)
-                else:
-                    callback.message_arrived(
-                        topicname, data, qos,
-                        packet.flags.retain, packet.msg_id
-                    )
-            elif packet.flags.qos == 1:
-                if callback is None:
-                    return (packet.topic_name, packet.data, 1,
-                            packet.flags.retain, packet.msg_id)
-                else:
-                    if callback.message_arrived(
-                       packet.topic_name, packet.data, 1,
-                       packet.flags.retain, packet.msg_id):
-
-                        self.puback.msg_id = packet.msg_id
-                        self.socket.send(self.puback.pack())
-            elif packet.flags.qos == 2:
-                self.in_msgs[packet.msg_id] = packet
-                self.pubrec.msg_id = packet.msg_id
-                self.socket.send(self.pubrec.pack())
+        elif packet.mh.msg_type in self._actions:
+            self._actions[packet.mh.msg_type](packet, callback, address)
 
         else:
             raise Exception(f'Unexpected packet {packet}')
@@ -203,3 +116,104 @@ class Receivers:
             if sys.exc_info()[0] != socket.error:
                 log.error(f"Unexpected exception {sys.exc_info()}")
                 traceback.print_exc()
+
+    def _process_advertise(self, packet, callback, address):
+        if hasattr(callback, "advertise"):
+            callback.advertise(address, packet.gw_id, packet.duration)
+
+    def _process_register(self, packet, callback, *args):
+        if callback and hasattr(callback, "register"):
+            callback.register(packet.topic_id, packet.topic_name)
+
+    def _process_puback(self, packet, callback, *args):
+        log.debug("Check if we are expecting a puback")
+        if packet.msg_id in self.out_msgs and \
+           self.out_msgs[packet.msg_id].flags.qos == 1:
+            del self.out_msgs[packet.msg_id]
+            if hasattr(callback, "published"):
+                callback.published(packet.msg_id)
+        else:
+            raise Exception(
+                f'No qos 1 message with message id {packet.msg_id} sent'
+            )
+
+    def _process_pubrec(self, packet, callback, *args):
+        if packet.msg_id in self.out_msgs:
+            self.pubrel.msg_id = packet.msg_id
+            self.socket.send(self.pubrel.pack())
+        else:
+            raise Exception(
+                'PUBREC received for unknown msg_id: {packet.msg_id}'
+            )
+
+    def _process_pubrel(self, packet, callback, *args):
+        log.debug("Release qos 2 publication to client, & send PUBCOMP")
+        msgid = packet.msg_id
+        if msgid not in self.in_msgs:
+            pass  # what should we do here?
+        else:
+            pub = self.in_msgs[packet.msg_id]
+            if callback is None or \
+                callback.message_arrived(
+                    pub.topic_name, pub.data, 2,
+                    pub.flags.retain, pub.msg_id):
+                del self.in_msgs[packet.msg_id]
+                self.pubcomp.msg_id = packet.msg_id
+                self.socket.send(self.pubcomp.pack())
+            if callback is None:
+                return (pub.topic_name, pub.data, 2,
+                        pub.flags.retain, pub.msg_id)
+
+    def _process_pubcomp(self, packet, callback, *args):
+        """
+        Finished with this message id
+        """
+        if packet.msg_id in self.out_msgs:
+            del self.out_msgs[packet.msg_id]
+            if hasattr(callback, "published"):
+                callback.published(packet.msg_id)
+        else:
+            raise Exception(
+                f'PUBCOMP received for unknown msg_id: {packet.msg_id}'
+            )
+
+    def _process_publish(self, packet, callback, *args):
+        """
+        Finished with this message id
+        """
+        if packet.flags.qos in [0, 3]:
+            qos = packet.flags.qos
+            topicname = packet.topic_name.decode('utf-8')
+            data = packet.data
+            log.debug(f'DATA ON MQTTSN: {data}')
+            if qos == 3:
+                qos = -1
+                # [FIXME] TOPIC_NORMAL is a workaround to this problem
+                # it was wrong implemented in the original library
+                if packet.flags.topic_id_type == TOPIC_NORMAL:
+                    topicname = packet.data[:packet.topic_id]
+                    data = packet.data[packet.topic_id:]
+            if callback is None:
+                return (topicname, data, qos,
+                        packet.flags.retain, packet.msg_id)
+            else:
+                callback.message_arrived(
+                    topicname, data, qos,
+                    packet.flags.retain, packet.msg_id
+                )
+        elif packet.flags.qos == 1:
+            if callback is None:
+                return (packet.topic_name, packet.data, 1,
+                        packet.flags.retain, packet.msg_id)
+            else:
+                if callback.message_arrived(
+                   packet.topic_name, packet.data, 1,
+                   packet.flags.retain, packet.msg_id):
+
+                    self.puback.msg_id = packet.msg_id
+                    self.socket.send(self.puback.pack())
+
+        elif packet.flags.qos == 2:
+            self.in_msgs[packet.msg_id] = packet
+            self.pubrec.msg_id = packet.msg_id
+            self.socket.send(self.pubrec.pack())
