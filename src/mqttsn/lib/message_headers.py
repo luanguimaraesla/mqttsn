@@ -32,13 +32,15 @@ class MessageHeaders:
 
     def encode(self, length):
         self.length = length + 2
-        assert 2 <= self.length <= 65535
+        assert 2 <= self.length and self.length <= 65535
         if self.length < 256:
             buffer = chr_(self.length)
             log.debug(f'Encoding length {self.length}')
         else:
             self.length += 2
             buffer = chr_(1) + write_int_16(self.length)
+            print(f'READ HEADER LEN: {read_int_16(buffer[1:])}')
+        print(f'MESSAGE HEADER LEN: {self.length}')
         return buffer
 
     def unpack(self, buffer):

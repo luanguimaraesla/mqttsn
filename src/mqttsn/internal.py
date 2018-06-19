@@ -159,6 +159,7 @@ class Receivers:
                 qos = packet.flags.qos
                 topicname = packet.topic_name.decode('utf-8')
                 data = packet.data
+                log.debug(f'DATA ON MQTTSN: {data}')
                 if qos == 3:
                     qos = -1
                     # [FIXME] TOPIC_NORMAL is a workaround to this problem

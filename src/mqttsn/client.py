@@ -208,6 +208,8 @@ class Client:
             log.debug(f'Message ID: {publish.msg_id}')
             self.__receiver.out_msgs[publish.msg_id] = publish
         publish.data = payload
+        import sys
+        print(f'PUBLISH: {publish.__str__()}', file=sys.stderr)
         self.sock.send(publish.pack())
         return publish.msg_id
 

@@ -17,15 +17,15 @@ def get_packet(a_socket):
     Receive the next packet
     """
     buf, address = a_socket.recvfrom(65535)  # get the first byte fixed header
+
     log.debug(f'buf {buf} addr {address} ord {buf[0]}')
-    if buf == "":
+    if buf == b'':
         return None
 
     length = buf[0]
     if length == 1:
-        if buf == "":
+        if buf == b'':
             return None
-        length = read_int_16(buf[1:])
 
     return buf, address
 
@@ -39,7 +39,10 @@ def message_type(buf):
 
 
 def writeUTF(a_string):
-    return write_int_16(len(a_string)) + a_string
+    if isinstance(a_string, str):
+        return write_int_16(len(a_string)) + a_string.encode('utf-8')
+    else:
+        return write_int_16(len(a_string)) + a_string
 
 
 def chr_(val):

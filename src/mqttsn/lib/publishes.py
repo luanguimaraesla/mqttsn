@@ -24,22 +24,34 @@ class Publishes(Packets):
             self.unpack(buffer)
 
     def pack(self):
+        """
+        Specification:
+               Length   MsgType   Flags   TopicID   MsgID   Data
+              (octet 0)   (1)      (2)     (3-4)    (5-6)   (7-n)
+        """
+
+        # Flags byte (1)
         buffer = self.flags.pack()
+
+        # TopicID bytes (2)
         if self.flags.topic_id_type in [TOPIC_NORMAL, TOPIC_PREDEFINED, 3]:
             log.debug(f'Topic id: {self.topic_id}')
             buffer += write_int_16(self.topic_id)
         elif self.flags.topic_id_type == TOPIC_SHORTNAME:
-            buffer += bytes((self.topic_name + "    ")[0:2].encode('utf-8'))
+            buffer += (self.topic_name + "  ")[0:2].encode('utf-8')
+
+        # MsgID bytes (2)
         buffer += write_int_16(self.msg_id)
 
-        if isinstance(self.data, str):
-            buffer += bytes(self.data.encode('utf-8'))
-        elif isinstance(self.data, bytes):
-            buffer += self.data
-        else:
-            raise TypeError('data should be str or bytes')
+        # Data bytes (n)
+        data = self.data
+        buffer += data if isinstance(data, bytes) else data.encode('utf-8')
 
-        return self.mh.pack(len(buffer)) + buffer
+        # Length + MsgType bytes
+        buffer = self.mh.pack(len(buffer)) + buffer
+        print(f'BUFFER: {buffer}')
+
+        return buffer
 
     def unpack(self, buffer):
         pos = self.mh.unpack(buffer)
