@@ -109,7 +109,7 @@ class Client:
             return id
 
         if len(self.__receiver.out_msgs) >= 65535:
-            raise "No slots left!!"
+            raise "Sorry, no slots left!!"
         else:
             self.msg_id = get_wrapped_msg_id()
             while self.msg_id in self.__receiver.out_msgs:
@@ -171,7 +171,6 @@ class Client:
         if self.__receiver:
             self.__receiver.lookfor(SUBACK)
         self.sock.send(subscribe.pack())
-        print(f"Message SUBACK ID: {subscribe.msg_id}")
         msg = self.waitfor(SUBACK, subscribe.msg_id)
 
         try:
