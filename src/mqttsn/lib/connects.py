@@ -19,7 +19,7 @@ class Connects(Packets):
         buffer = self.flags.pack()
         buffer += chr_(self.protocol_id)
         buffer += write_int_16(self.duration)
-        buffer += self.client_id
+        buffer += self.client_id.encode()
         return self.mh.pack(len(buffer)) + buffer
 
     def unpack(self, buffer):
