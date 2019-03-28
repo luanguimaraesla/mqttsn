@@ -53,8 +53,14 @@ class MessageHeaders:
             return chr_(length + 1)
         elif self._is_long_buffer(length + 3):
             return chr_(1) + write_int_16(length + 3)
+        elif length == 1:
+            """
+                control message: header only, no payload: 1 octet plus
+                length field: 1 octet
+            """
+            return chr_(length + 1)
         else:
-            raise "Invalid buffer size"
+            raise Exception(str("Invalid buffer size "+str(length)))
 
     def unpack(self, buffer):
         """

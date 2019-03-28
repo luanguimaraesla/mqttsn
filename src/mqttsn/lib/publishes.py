@@ -59,11 +59,11 @@ class Publishes(Packets):
         pos += self.flags.unpack(buffer[pos:])
 
         self.topic_id = 0
-        self.topic_name = ""
+        self.topic_name = str("").encode()
         if self.flags.topic_id_type in [TOPIC_NORMAL, TOPIC_PREDEFINED]:
             self.topic_id = read_int_16(buffer[pos:])
         elif self.flags.topic_id_type == TOPIC_SHORTNAME:
-            self.topic_name = buffer[pos:pos + 2]
+            self.topic_name = str(buffer[pos:pos + 2]).encode()
 
         pos += 2
         self.msg_id = read_int_16(buffer[pos:])
